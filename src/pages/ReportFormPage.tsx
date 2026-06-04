@@ -381,21 +381,20 @@ export default function ReportFormPage() {
     }
 
     // Validate evidence for negative/neutral selections
-    const missingEvidence = Object.values(checklistData.items)
-      .flatMap((item) =>
-        item.checks
-          .filter(
-            (check) =>
-              check.selectedOption &&
-              requiresEvidence(check.selectedOption, check.options),
-          )
-          .filter(
-            (check) =>
-              !check.issuePhotoFile &&
-              !pendingEvidenceUploads.current.has(check.id),
-          )
-          .map((check) => check.label),
-      );
+    const missingEvidence = Object.values(checklistData.items).flatMap((item) =>
+      item.checks
+        .filter(
+          (check) =>
+            check.selectedOption &&
+            requiresEvidence(check.selectedOption, check.options),
+        )
+        .filter(
+          (check) =>
+            !check.issuePhotoFile &&
+            !pendingEvidenceUploads.current.has(check.id),
+        )
+        .map((check) => check.label),
+    );
     if (missingEvidence.length > 0) {
       setSubmitError(
         `Evidence photo required for: ${missingEvidence.join(", ")}`,
@@ -404,8 +403,8 @@ export default function ReportFormPage() {
     }
 
     // Validate description for negative/neutral selections
-    const missingDescription = Object.values(checklistData.items)
-      .flatMap((item) =>
+    const missingDescription = Object.values(checklistData.items).flatMap(
+      (item) =>
         item.checks
           .filter(
             (check) =>
@@ -414,7 +413,7 @@ export default function ReportFormPage() {
           )
           .filter((check) => !check.issueDescription?.trim())
           .map((check) => check.label),
-      );
+    );
     if (missingDescription.length > 0) {
       setSubmitError(
         `Description required for: ${missingDescription.join(", ")}`,
@@ -462,44 +461,47 @@ export default function ReportFormPage() {
       const totalPending = issuePhotosToUpload.length;
       let uploaded = 0;
 
+      // Track uploaded URLs
+      const uploadedUrls = new Map<string, string>();
+
       // Upload issue photos
       for (const evidence of issuePhotosToUpload) {
         const compressed = await compressImage(evidence.photoFile);
         const result = await uploadImage(compressed);
 
-        // Update checklist data with uploaded URL
-        setChecklistData((prev) => {
-          const newItems = { ...prev.items };
-          for (const itemId in newItems) {
-            const checkIndex = newItems[itemId].checks.findIndex(
-              (c) => c.id === evidence.checkId,
-            );
-            if (checkIndex !== -1) {
-              newItems[itemId] = {
-                ...newItems[itemId],
-                checks: newItems[itemId].checks.map((c, i) =>
-                  i === checkIndex
-                    ? {
-                        ...c,
-                        issuePhotoUrl: result.url,
-                        issuePhotoFile: undefined,
-                        issuePhotoPreview: undefined,
-                        issueDescription: evidence.description,
-                      }
-                    : c,
-                ),
-              };
-              break;
-            }
-          }
-          return { ...prev, items: newItems };
-        });
+        // Store the URL
+        uploadedUrls.set(evidence.checkId, result.url);
 
         uploaded++;
         setUploadProgress(Math.round((uploaded / totalPending) * 100));
       }
 
-      const finalChecklist = checklistData;
+      // Build final checklist with uploaded URLs (deep clone to preserve hasIssues)
+      const finalChecklist = JSON.parse(JSON.stringify(checklistData));
+
+      // Apply uploaded URLs to final checklist
+      for (const [checkId, url] of uploadedUrls) {
+        const evidence = pendingEvidenceUploads.current.get(checkId);
+        if (evidence) {
+          for (const itemId in finalChecklist.items) {
+            const checkIndex = finalChecklist.items[itemId].checks.findIndex(
+              (c: any) => c.id === checkId,
+            );
+            if (checkIndex !== -1) {
+              finalChecklist.items[itemId].checks[checkIndex].issuePhotoUrl =
+                url;
+              finalChecklist.items[itemId].checks[checkIndex].issuePhotoFile =
+                undefined;
+              finalChecklist.items[itemId].checks[
+                checkIndex
+              ].issuePhotoPreview = undefined;
+              finalChecklist.items[itemId].checks[checkIndex].issueDescription =
+                evidence.description;
+              break;
+            }
+          }
+        }
+      }
 
       await createReport(
         {

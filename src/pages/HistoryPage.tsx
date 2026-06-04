@@ -46,10 +46,16 @@ export default function HistoryPage() {
     return new Date(timestamp).toLocaleString();
   }
 
-  function getStatusColor(status: Report["status"]): string {
+  function getStatusColor(
+    status: Report["status"],
+    hasIssues: boolean,
+  ): string {
+    if (status === "pending" && hasIssues) {
+      return "bg-red-900/50 text-red-300 border-red-800"; // Issues pending
+    }
     switch (status) {
       case "pending":
-        return "bg-red-900/50 text-red-300 border-red-800";
+        return "bg-yellow-900/50 text-yellow-300 border-yellow-800";
       case "in_progress":
         return "bg-blue-900/50 text-blue-300 border-blue-800";
       case "resolved":
@@ -78,10 +84,14 @@ export default function HistoryPage() {
     const option = check.selectedOption;
     const options = check.options || [];
     const index = options.indexOf(option);
-    // Negative or neutral
-    if (options.length === 2) return index === 1;
-    if (options.length === 3) return index === 1 || index === 2;
-    return index === options.length - 1;
+    // Negative or neutral - but also needs to NOT have after photo
+    const isIssue =
+      options.length === 2
+        ? index === 1
+        : options.length === 3
+          ? index >= 1
+          : index === options.length - 1;
+    return isIssue && !check.afterPhotoUrl;
   }
 
   async function handleUpdateAfterPhoto(reportId: string, checkId: string) {
@@ -95,26 +105,6 @@ export default function HistoryPage() {
 
       // Remove from pending
       pendingAfterUploads.current.delete(checkId);
-
-      // Update local state
-      setReports((prev) =>
-        prev.map((report) => {
-          if (report.reportId === reportId && report.checklistData) {
-            const updatedItems = { ...report.checklistData.items };
-            for (const itemId in updatedItems) {
-              const checkIndex = updatedItems[itemId].checks.findIndex(
-                (c) => c.id === checkId,
-              );
-              if (checkIndex !== -1) {
-                updatedItems[itemId].checks[checkIndex].afterPhotoUrl = ""; // Will be updated on reload
-                break;
-              }
-            }
-            return { ...report, status: "resolved" as const };
-          }
-          return report;
-        }),
-      );
 
       // Reload reports to get updated data
       loadReports();
@@ -296,7 +286,7 @@ export default function HistoryPage() {
                     {report.areaName || report.areaId}
                   </p>
                   <span
-                    className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full border ${getStatusColor(report.status)}`}
+                    className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full border ${getStatusColor(report.status, report.checklistData?.hasIssues ?? false)}`}
                   >
                     {getStatusLabel(report.status)}
                   </span>
