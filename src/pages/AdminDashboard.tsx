@@ -1,91 +1,105 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
-import { getReports, updateReportStatus } from '../lib/supabaseDb'
-import type { Report, ReportStatus } from '../types'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
+import { getReports, updateReportStatus } from "../lib/supabaseDb";
+import type { Report, ReportStatus } from "../types";
+import { motion, AnimatePresence } from "framer-motion";
 
 const STATUS_LABELS: Record<ReportStatus, string> = {
-  pending: 'Pending',
-  in_progress: 'In Progress',
-  resolved: 'Resolved',
-}
+  pending: "Pending",
+  in_progress: "In Progress",
+  resolved: "Resolved",
+};
 
 const STATUS_COLORS: Record<ReportStatus, string> = {
-  pending: 'bg-yellow-900/50 text-yellow-300 border-yellow-800',
-  in_progress: 'bg-blue-900/50 text-blue-300 border-blue-800',
-  resolved: 'bg-green-900/50 text-green-300 border-green-800'
-}
+  pending: "bg-yellow-900/50 text-yellow-300 border-yellow-800",
+  in_progress: "bg-blue-900/50 text-blue-300 border-blue-800",
+  resolved: "bg-green-900/50 text-green-300 border-green-800",
+};
 
 function timeAgo(ts: number): string {
-  const diff = Date.now() - ts
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }
 
 export default function AdminDashboard() {
-  const { appUser, signOut } = useAuth()
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const [statusFilter, setStatusFilter] = useState<ReportStatus | undefined>(undefined)
-  const [selectedReport, setSelectedReport] = useState<Report | null>(null)
+  const { appUser, signOut } = useAuth();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [statusFilter, setStatusFilter] = useState<ReportStatus | undefined>(
+    undefined,
+  );
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
 
-  const { data: reports = [], isLoading, error } = useQuery({
-    queryKey: ['reports', statusFilter],
+  const {
+    data: reports = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["reports", statusFilter],
     queryFn: () => getReports(statusFilter),
-    refetchInterval: 30_000 // Auto-refresh every 30s
-  })
+    refetchInterval: 30_000, // Auto-refresh every 30s
+  });
 
   const updateStatus = useMutation({
-    mutationFn: ({ reportId, status }: { reportId: string; status: ReportStatus }) =>
-      updateReportStatus(reportId, status),
+    mutationFn: ({
+      reportId,
+      status,
+    }: {
+      reportId: string;
+      status: ReportStatus;
+    }) => updateReportStatus(reportId, status),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['reports'] })
-      setSelectedReport(null)
-    }
-  })
+      void queryClient.invalidateQueries({ queryKey: ["reports"] });
+      setSelectedReport(null);
+    },
+  });
 
   const filters: Array<{ label: string; value: ReportStatus | undefined }> = [
-    { label: 'All', value: undefined },
-    { label: 'Pending', value: 'pending' },
-    { label: 'In Progress', value: 'in_progress' },
-    { label: 'Resolved', value: 'resolved' }
-  ]
+    { label: "All", value: undefined },
+    { label: "Pending", value: "pending" },
+    { label: "In Progress", value: "in_progress" },
+    { label: "Resolved", value: "resolved" },
+  ];
 
   // Get first issue photo from checklist
   function getFirstIssuePhoto(checklistData: any): string | null {
-    if (!checklistData?.items) return null
+    if (!checklistData?.items) return null;
     for (const itemId in checklistData.items) {
       for (const check of checklistData.items[itemId].checks) {
-        if (check.issuePhotoUrl) return check.issuePhotoUrl
+        if (check.issuePhotoUrl) return check.issuePhotoUrl;
       }
     }
-    return null
+    return null;
   }
 
   // Get issue count
   function getIssueCount(checklistData: any): number {
-    if (!checklistData?.items) return 0
-    let count = 0
+    if (!checklistData?.items) return 0;
+    let count = 0;
     for (const itemId in checklistData.items) {
       for (const check of checklistData.items[itemId].checks) {
-        const options = check.options || []
-        const selectedOption = check.selectedOption
+        const options = check.options || [];
+        const selectedOption = check.selectedOption;
         if (selectedOption) {
-          const index = options.indexOf(selectedOption)
-          const isIssue = options.length === 2 
-            ? index === 1 
-            : (options.length === 3 ? index >= 1 : index === options.length - 1)
-          if (isIssue) count++
+          const index = options.indexOf(selectedOption);
+          const isIssue =
+            options.length === 2
+              ? index === 1
+              : options.length === 3
+                ? index >= 1
+                : index === options.length - 1;
+          if (isIssue) count++;
         }
       }
     }
-    return count
+    return count;
   }
 
   return (
@@ -99,12 +113,14 @@ export default function AdminDashboard() {
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-white font-bold text-xl">Dashboard</h1>
-            <p className="text-factory-muted text-xs mt-0.5">Welcome, {appUser?.displayName}</p>
+            <p className="text-factory-muted text-xs mt-0.5">
+              Welcome, {appUser?.displayName}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <motion.button
               whileTap={{ scale: 0.95 }}
-              onClick={() => navigate('/qr-generator')}
+              onClick={() => navigate("/qr-generator")}
               className="bg-factory-accent/20 text-factory-accent border border-factory-accent/30 text-sm px-3 py-2 rounded-lg min-h-[44px] font-medium"
             >
               QR Codes
@@ -124,11 +140,22 @@ export default function AdminDashboard() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: 'Total', count: reports.length, color: 'text-white' },
-            { label: 'Pending', count: reports.filter(r => r.status === 'pending').length, color: 'text-yellow-400' },
-            { label: 'Resolved', count: reports.filter(r => r.status === 'resolved').length, color: 'text-green-400' }
-          ].map(stat => (
-            <div key={stat.label} className="bg-factory-card border border-factory-border rounded-xl p-4 text-center">
+            { label: "Total", count: reports.length, color: "text-white" },
+            {
+              label: "Pending",
+              count: reports.filter((r) => r.status === "pending").length,
+              color: "text-yellow-400",
+            },
+            {
+              label: "Resolved",
+              count: reports.filter((r) => r.status === "resolved").length,
+              color: "text-green-400",
+            },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              className="bg-factory-card border border-factory-border rounded-xl p-4 text-center"
+            >
               <p className={`text-2xl font-bold ${stat.color}`}>{stat.count}</p>
               <p className="text-factory-muted text-xs mt-0.5">{stat.label}</p>
             </div>
@@ -137,14 +164,14 @@ export default function AdminDashboard() {
 
         {/* Filters */}
         <div className="flex gap-2 overflow-x-auto pb-1">
-          {filters.map(f => (
+          {filters.map((f) => (
             <button
               key={f.label}
               onClick={() => setStatusFilter(f.value)}
               className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors min-h-[36px] ${
                 statusFilter === f.value
-                  ? 'bg-factory-accent text-white'
-                  : 'bg-factory-card border border-factory-border text-factory-muted hover:text-white'
+                  ? "bg-factory-accent text-white"
+                  : "bg-factory-card border border-factory-border text-factory-muted hover:text-white"
               }`}
             >
               {f.label}
@@ -168,9 +195,9 @@ export default function AdminDashboard() {
           </div>
         ) : (
           <div className="space-y-3">
-            {reports.map(report => {
-              const issuePhoto = getFirstIssuePhoto(report.checklistData)
-              const issueCount = getIssueCount(report.checklistData)
+            {reports.map((report) => {
+              const issuePhoto = getFirstIssuePhoto(report.checklistData);
+              const issueCount = getIssueCount(report.checklistData);
               return (
                 <motion.div
                   key={report.reportId}
@@ -183,26 +210,34 @@ export default function AdminDashboard() {
                   <div className="flex gap-3">
                     {issuePhoto && (
                       <img
-                          src={issuePhoto}
-                          alt="Issue"
-                          className="w-16 h-16 rounded-xl object-cover flex-shrink-0 bg-factory-border"
+                        src={issuePhoto}
+                        alt="Issue"
+                        className="w-16 h-16 rounded-xl object-cover flex-shrink-0 bg-factory-border"
                       />
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-white font-medium text-sm truncate">{report.areaName || report.areaId}</p>
-                        <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[report.status]}`}>
+                        <p className="text-white font-medium text-sm truncate">
+                          {report.areaName || report.areaId}
+                        </p>
+                        <span
+                          className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[report.status]}`}
+                        >
                           {STATUS_LABELS[report.status]}
                         </span>
                       </div>
                       <p className="text-factory-muted text-sm mt-1">
-                        {issueCount > 0 ? `${issueCount} issue(s) found` : 'No issues'}
+                        {issueCount > 0
+                          ? `${issueCount} issue(s) found`
+                          : "No issues"}
                       </p>
-                      <p className="text-factory-muted/60 text-xs mt-1.5">{timeAgo(report.timestamp)}</p>
+                      <p className="text-factory-muted/60 text-xs mt-1.5">
+                        {timeAgo(report.timestamp)}
+                      </p>
                     </div>
                   </div>
                 </motion.div>
-              )
+              );
             })}
           </div>
         )}
@@ -222,7 +257,7 @@ export default function AdminDashboard() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              onClick={e => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
               className="bg-factory-card border border-factory-border rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto"
             >
               <div className="p-4 border-b border-factory-border flex items-center justify-between">
@@ -237,28 +272,41 @@ export default function AdminDashboard() {
               </div>
 
               <div className="p-4 space-y-4">
-                 <AnimatePresence>
-                   {getFirstIssuePhoto(selectedReport.checklistData) && (
-                     <motion.img
-                       key="photo"
-                       initial={{ opacity: 0, scale: 0.95 }}
-                       animate={{ opacity: 1, scale: 1 }}
-                       src={getFirstIssuePhoto(selectedReport.checklistData)!}
-                       alt="Issue"
-                       className="w-full rounded-xl object-cover max-h-48"
-                     />
-                   )}
-                 </AnimatePresence>
+                <AnimatePresence>
+                  {getFirstIssuePhoto(selectedReport.checklistData) && (
+                    <motion.img
+                      key="photo"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      src={getFirstIssuePhoto(selectedReport.checklistData)!}
+                      alt="Issue"
+                      className="w-full rounded-xl object-cover max-h-48"
+                    />
+                  )}
+                </AnimatePresence>
 
                 <div className="space-y-2 text-sm">
                   {[
-                    { label: 'Area', value: selectedReport.areaName || selectedReport.areaId },
-                    { label: 'Time', value: new Date(selectedReport.timestamp).toLocaleString() },
-                    ...(selectedReport.gpsLat !== undefined && selectedReport.gpsLng !== undefined
-                      ? [{ label: 'GPS', value: `${selectedReport.gpsLat.toFixed(5)}, ${selectedReport.gpsLng.toFixed(5)}` }]
-                      : []
-                    )
-                  ].map(item => (
+                    {
+                      label: "Area",
+                      value: selectedReport.areaName || selectedReport.areaId,
+                    },
+                    {
+                      label: "Time",
+                      value: new Date(
+                        selectedReport.timestamp,
+                      ).toLocaleString(),
+                    },
+                    ...(selectedReport.gpsLat !== undefined &&
+                    selectedReport.gpsLng !== undefined
+                      ? [
+                          {
+                            label: "GPS",
+                            value: `${selectedReport.gpsLat.toFixed(5)}, ${selectedReport.gpsLng.toFixed(5)}`,
+                          },
+                        ]
+                      : []),
+                  ].map((item) => (
                     <motion.div
                       key={item.label}
                       initial={{ opacity: 0, x: -10 }}
@@ -277,7 +325,9 @@ export default function AdminDashboard() {
                     className="flex justify-between"
                   >
                     <span className="text-factory-muted">Status</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[selectedReport.status]}`}>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[selectedReport.status]}`}
+                    >
                       {STATUS_LABELS[selectedReport.status]}
                     </span>
                   </motion.div>
@@ -286,53 +336,81 @@ export default function AdminDashboard() {
                 {/* Checklist details */}
                 {selectedReport.checklistData && (
                   <div>
-                    <p className="text-factory-muted text-sm mb-2">Checklist Items</p>
+                    <p className="text-factory-muted text-sm mb-2">
+                      Checklist Items
+                    </p>
                     <div className="space-y-2">
-                      {Object.values(selectedReport.checklistData.items).map(item => (
-                        <div key={item.id} className="p-2 bg-factory-dark/50 rounded-lg">
-                          <p className="text-factory-accent text-xs font-medium">{item.name}</p>
-                          {item.checks.map(check => {
-                            const hasIssue = check.issuePhotoUrl
-                            const hasAfter = check.afterPhotoUrl
-                            return (
-                              <div key={check.id} className="flex items-center justify-between text-xs py-1">
-                                <span className="text-white truncate">{check.label}</span>
-                                <div className="flex items-center gap-1">
-                                  {hasIssue && (
-                                    <span className="text-red-400 text-xs">Before</span>
-                                  )}
-                                  {hasAfter && (
-                                    <span className="text-green-400 text-xs">After</span>
-                                  )}
-                                  <span className="text-factory-muted">
-                                    {check.selectedOption || '-'}
+                      {Object.values(selectedReport.checklistData.items).map(
+                        (item) => (
+                          <div
+                            key={item.id}
+                            className="p-2 bg-factory-dark/50 rounded-lg"
+                          >
+                            <p className="text-factory-accent text-xs font-medium">
+                              {item.name}
+                            </p>
+                            {item.checks.map((check) => {
+                              const hasIssue = check.issuePhotoUrl;
+                              const hasAfter = check.afterPhotoUrl;
+                              return (
+                                <div
+                                  key={check.id}
+                                  className="flex items-center justify-between text-xs py-1"
+                                >
+                                  <span className="text-white truncate">
+                                    {check.label}
                                   </span>
+                                  <div className="flex items-center gap-1">
+                                    {hasIssue && (
+                                      <span className="text-red-400 text-xs">
+                                        Before
+                                      </span>
+                                    )}
+                                    {hasAfter && (
+                                      <span className="text-green-400 text-xs">
+                                        After
+                                      </span>
+                                    )}
+                                    <span className="text-factory-muted">
+                                      {check.selectedOption || "-"}
+                                    </span>
+                                  </div>
                                 </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      ))}
+                              );
+                            })}
+                          </div>
+                        ),
+                      )}
                     </div>
                   </div>
                 )}
 
                 {/* Status update actions */}
                 <div className="flex gap-2">
-                  {selectedReport.status !== 'in_progress' && (
+                  {selectedReport.status !== "in_progress" && (
                     <motion.button
                       whileTap={{ scale: 0.95 }}
-                      onClick={() => updateStatus.mutate({ reportId: selectedReport.reportId, status: 'in_progress' })}
+                      onClick={() =>
+                        updateStatus.mutate({
+                          reportId: selectedReport.reportId,
+                          status: "in_progress",
+                        })
+                      }
                       disabled={updateStatus.isPending}
                       className="flex-1 bg-blue-900/50 border border-blue-700 text-blue-300 py-2.5 rounded-xl text-sm font-medium min-h-[44px] disabled:opacity-50"
                     >
                       Mark In Progress
                     </motion.button>
                   )}
-                  {selectedReport.status !== 'resolved' && (
+                  {selectedReport.status !== "resolved" && (
                     <motion.button
                       whileTap={{ scale: 0.95 }}
-                      onClick={() => updateStatus.mutate({ reportId: selectedReport.reportId, status: 'resolved' })}
+                      onClick={() =>
+                        updateStatus.mutate({
+                          reportId: selectedReport.reportId,
+                          status: "resolved",
+                        })
+                      }
                       disabled={updateStatus.isPending}
                       className="flex-1 bg-green-900/50 border border-green-700 text-green-300 py-2.5 rounded-xl text-sm font-medium min-h-[44px] disabled:opacity-50"
                     >
@@ -346,5 +424,5 @@ export default function AdminDashboard() {
         )}
       </AnimatePresence>
     </motion.div>
-  )
+  );
 }

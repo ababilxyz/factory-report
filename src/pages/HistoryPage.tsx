@@ -1,10 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import {
-  getReportsByWorkerId,
-  updateCheckAfterPhoto,
-} from "../lib/supabaseDb";
+import { getReportsByWorkerId, updateCheckAfterPhoto } from "../lib/supabaseDb";
 import { openCameraCapture } from "../utils/imageUtils";
 import type { Report } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
@@ -123,9 +120,7 @@ export default function HistoryPage() {
       loadReports();
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to update after photo",
+        err instanceof Error ? err.message : "Failed to update after photo",
       );
     } finally {
       setUpdatingCheckId(null);
@@ -198,7 +193,11 @@ export default function HistoryPage() {
             updatedItems[itemId].checks = updatedItems[itemId].checks.map(
               (c) =>
                 c.id === checkId
-                  ? { ...c, afterPhotoPreview: undefined, afterPhotoFile: undefined }
+                  ? {
+                      ...c,
+                      afterPhotoPreview: undefined,
+                      afterPhotoFile: undefined,
+                    }
                   : c,
             );
           }
@@ -311,7 +310,10 @@ export default function HistoryPage() {
                 {report.checklistData && (
                   <div className="space-y-3">
                     {Object.values(report.checklistData.items).map((item) => (
-                      <div key={item.id} className="border-t border-factory-border pt-3">
+                      <div
+                        key={item.id}
+                        className="border-t border-factory-border pt-3"
+                      >
                         <p className="text-factory-accent text-xs font-medium mb-2">
                           {item.name} ({item.code})
                         </p>
@@ -321,7 +323,10 @@ export default function HistoryPage() {
                             const hasAfterPhoto = !!check.afterPhotoUrl;
 
                             return (
-                              <div key={check.id} className="p-2 bg-factory-dark/50 rounded-lg">
+                              <div
+                                key={check.id}
+                                className="p-2 bg-factory-dark/50 rounded-lg"
+                              >
                                 <div className="flex items-center justify-between mb-1">
                                   <span className="text-white text-xs font-medium">
                                     {check.label}
@@ -390,7 +395,9 @@ export default function HistoryPage() {
                                                 check.id,
                                               )
                                             }
-                                            disabled={updatingCheckId === check.id}
+                                            disabled={
+                                              updatingCheckId === check.id
+                                            }
                                             className="absolute bottom-1 right-1 bg-green-600 text-white text-xs px-3 py-1 rounded min-h-[36px]"
                                           >
                                             {updatingCheckId === check.id

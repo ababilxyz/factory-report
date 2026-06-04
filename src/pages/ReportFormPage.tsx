@@ -422,35 +422,12 @@ export default function ReportFormPage() {
       return;
     }
 
-    // Validate after photo for negative/neutral selections
-    const missingAfterPhoto = Object.values(checklistData.items)
-      .flatMap((item) =>
-        item.checks
-          .filter(
-            (check) =>
-              check.selectedOption &&
-              requiresEvidence(check.selectedOption, check.options),
-          )
-          .filter(
-            (check) =>
-              !check.afterPhotoFile &&
-              !pendingAfterUploads.current.has(check.id),
-          )
-          .map((check) => check.label),
-      );
-    if (missingAfterPhoto.length > 0) {
-      setSubmitError(
-        `After photo required for: ${missingAfterPhoto.join(", ")}`,
-      );
-      return;
-    }
-
     setSubmitError("");
     setSubmitting(true);
     setUploadProgress(0);
 
     try {
-      // Collect all evidence photos to upload (issue photos)
+      // Collect all evidence photos to upload (issue photos only)
       const issuePhotosToUpload: Array<{
         checkId: string;
         photoFile: File;
@@ -482,31 +459,7 @@ export default function ReportFormPage() {
         }
       }
 
-      // Collect all after photos to upload
-      const afterPhotosToUpload: Array<{
-        checkId: string;
-        photoFile: File;
-      }> = [];
-
-      for (const [checkId, photoFile] of pendingAfterUploads.current) {
-        afterPhotosToUpload.push({ checkId, photoFile });
-      }
-
-      for (const item of Object.values(checklistData.items)) {
-        for (const check of item.checks) {
-          if (
-            check.afterPhotoFile &&
-            !pendingAfterUploads.current.has(check.id)
-          ) {
-            afterPhotosToUpload.push({
-              checkId: check.id,
-              photoFile: check.afterPhotoFile,
-            });
-          }
-        }
-      }
-
-      const totalPending = issuePhotosToUpload.length + afterPhotosToUpload.length;
+      const totalPending = issuePhotosToUpload.length;
       let uploaded = 0;
 
       // Upload issue photos
@@ -543,43 +496,7 @@ export default function ReportFormPage() {
         });
 
         uploaded++;
-        setUploadProgress(Math.round((uploaded / totalPending) * 50));
-      }
-
-      // Upload after photos
-      for (const after of afterPhotosToUpload) {
-        const compressed = await compressImage(after.photoFile);
-        const result = await uploadImage(compressed);
-
-        // Update checklist data with uploaded URL
-        setChecklistData((prev) => {
-          const newItems = { ...prev.items };
-          for (const itemId in newItems) {
-            const checkIndex = newItems[itemId].checks.findIndex(
-              (c) => c.id === after.checkId,
-            );
-            if (checkIndex !== -1) {
-              newItems[itemId] = {
-                ...newItems[itemId],
-                checks: newItems[itemId].checks.map((c, i) =>
-                  i === checkIndex
-                    ? {
-                        ...c,
-                        afterPhotoUrl: result.url,
-                        afterPhotoFile: undefined,
-                        afterPhotoPreview: undefined,
-                      }
-                    : c,
-                ),
-              };
-              break;
-            }
-          }
-          return { ...prev, items: newItems };
-        });
-
-        uploaded++;
-        setUploadProgress(Math.round((uploaded / totalPending) * 50 + 50));
+        setUploadProgress(Math.round((uploaded / totalPending) * 100));
       }
 
       const finalChecklist = checklistData;
