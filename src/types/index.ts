@@ -45,6 +45,10 @@ export interface CheckItem {
     options: string[]  // Dynamic options like "Baik", "Rusak", "Sesuai", "Tidak Sesuai"
     selectedOption?: string  // The selected option label
     order?: number  // Display order
+    issuePhotoUrl?: string  // Photo for issue (negative/neutral option)
+    issueDescription?: string  // Description for issue
+    issuePhotoFile?: File  // Photo file for upload (transient)
+    issuePhotoPreview?: string  // Photo preview URL (transient)
 }
 
 export interface Item {

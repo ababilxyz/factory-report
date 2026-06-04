@@ -102,7 +102,11 @@ export function useQrScanner() {
         coords = await getCurrentPosition(12000)
       } catch (e: unknown) {
         const err = e as { code: string; message: string }
-        throw { code: err.code || 'PERMISSION_DENIED', message: err.message }
+        // Map GeolocationError codes to ScanError codes
+        if (err.code === 'UNAVAILABLE' || err.code === 'TIMEOUT') {
+          throw { code: 'PERMISSION_DENIED', message: err.message }
+        }
+        throw { code: (err.code as ScanError['code']) || 'PERMISSION_DENIED', message: err.message }
       }
 
       const distance = haversineDistance(coords.lat, coords.lng, area.allowedLat, area.allowedLng)

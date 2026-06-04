@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { createReport, getChecksByItemId, getItem } from '../lib/supabaseDb'
-import { openCameraCapture } from '../utils/imageUtils'
+import { openCameraCapture, compressImage } from '../utils/imageUtils'
+import { uploadImage } from '../lib/storage'
 import type { ScanResult, ChecklistData, Item, CheckItem } from '../types'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -55,10 +56,53 @@ async function fetchChecklistFromDb(itemId: string): Promise<ChecklistData | nul
   }
 }
 
-// Helper to determine if a selected option indicates an issue
-function isIssueOption(option: string): boolean {
-  const issueOptions = ['Rusak', 'Tidak Sesuai', 'Kotor', 'Terkelupas']
-  return issueOptions.includes(option)
+// Helper to determine option status based on array position
+// 2 options: [0]=positive (green), [1]=negative (red)
+// 3 options: [0]=positive (green), [1]=neutral (yellow), [2]=negative (red)
+export function getOptionStatus(option: string, options: string[]): 'positive' | 'neutral' | 'negative' {
+  const index = options.indexOf(option)
+  if (index === -1) return 'positive' // Default to positive if not found
+  
+  if (options.length === 2) {
+    return index === 0 ? 'positive' : 'negative'
+  }
+  
+  if (options.length === 3) {
+    if (index === 0) return 'positive'
+    if (index === 1) return 'neutral'
+    return 'negative'
+  }
+  
+  // For other array lengths, last option is considered negative
+  return index === options.length - 1 ? 'negative' : 'positive'
+}
+
+// Check if option requires photo and description (negative or neutral)
+export function requiresEvidence(option: string, options: string[]): boolean {
+  const status = getOptionStatus(option, options)
+  return status === 'negative' || status === 'neutral'
+}
+
+// Helper to determine if a selected option indicates an issue (memoized for efficiency)
+function isIssueOption(option: string, options: string[]): boolean {
+  const status = getOptionStatus(option, options)
+  return status === 'negative' || status === 'neutral'
+}
+
+// Get button style based on option status
+function getOptionButtonStyle(isSelected: boolean, status: 'positive' | 'neutral' | 'negative') {
+  if (!isSelected) {
+    return 'bg-factory-border/30 text-factory-muted border border-factory-border'
+  }
+  
+  switch (status) {
+    case 'positive':
+      return 'bg-green-900/50 text-green-300 border border-green-800'
+    case 'neutral':
+      return 'bg-yellow-900/50 text-yellow-300 border border-yellow-800'
+    case 'negative':
+      return 'bg-red-900/50 text-red-300 border border-red-800'
+  }
 }
 
 export default function ReportFormPage() {
@@ -74,6 +118,27 @@ export default function ReportFormPage() {
   const [beforePhotoPreview, setBeforePhotoPreview] = useState<string | null>(null)
   const [afterPhotoPreview, setAfterPhotoPreview] = useState<string | null>(null)
   const [isAfterPhoto, setIsAfterPhoto] = useState(false)
+
+  // Cleanup preview URLs on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (beforePhotoPreview) URL.revokeObjectURL(beforePhotoPreview)
+      if (afterPhotoPreview) URL.revokeObjectURL(afterPhotoPreview)
+    }
+  }, [beforePhotoPreview, afterPhotoPreview])
+
+  // Cleanup check-level preview URLs on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(checklistData.items).forEach(item => {
+        item.checks.forEach(check => {
+          if (check.issuePhotoPreview) {
+            URL.revokeObjectURL(check.issuePhotoPreview)
+          }
+        })
+      })
+    }
+  }, [])
 
   // State for description and checklist
   const [description, setDescription] = useState('')
@@ -94,6 +159,9 @@ export default function ReportFormPage() {
   const [submitError, setSubmitError] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
+  // Track pending evidence uploads (check-level photos)
+  const pendingEvidenceUploads = useRef<Map<string, { photoFile: File, description: string }>>(new Map())
+
   // Redirect if no scan result
   useEffect(() => {
     if (!scanResult) navigate('/home', { replace: true })
@@ -102,7 +170,7 @@ export default function ReportFormPage() {
   // Update hasIssues when checklist changes
   useEffect(() => {
     const hasIssues = Object.values(checklistData.items).some(item =>
-      item.checks.some(check => check.selectedOption && isIssueOption(check.selectedOption))
+      item.checks.some(check => check.selectedOption && isIssueOption(check.selectedOption, check.options))
     )
     if (hasIssues !== checklistData.hasIssues) {
       setChecklistData(prev => ({ ...prev, hasIssues }))
@@ -130,6 +198,66 @@ export default function ReportFormPage() {
     }
   }
 
+  // Handle taking photo for check item evidence
+  async function handleTakeCheckPhoto(itemId: string, checkId: string) {
+    try {
+      const file = await openCameraCapture()
+      
+      // Store in pending uploads map
+      const currentCheck = checklistData.items[itemId]?.checks.find(c => c.id === checkId)
+      const currentDesc = currentCheck?.issueDescription || ''
+      pendingEvidenceUploads.current.set(checkId, { photoFile: file, description: currentDesc })
+      
+      // Create preview URL
+      const url = URL.createObjectURL(file)
+      
+      // Update checklist with preview
+      setChecklistData(prev => {
+        const newItems = { ...prev.items }
+        if (newItems[itemId]) {
+          newItems[itemId] = {
+            ...newItems[itemId],
+            checks: newItems[itemId].checks.map(check =>
+              check.id === checkId 
+                ? { ...check, issuePhotoPreview: url, issuePhotoFile: file }
+                : check
+            )
+          }
+        }
+        return { ...prev, items: newItems }
+      })
+    } catch (err) {
+      if (err instanceof Error && err.message !== 'Camera cancelled') {
+        setSubmitError('Could not access camera. ' + err.message)
+      }
+    }
+  }
+
+  // Handle check description change
+  function handleCheckDescription(itemId: string, checkId: string, desc: string) {
+    // Update pending uploads map
+    const currentCheck = checklistData.items[itemId]?.checks.find(c => c.id === checkId)
+    if (currentCheck?.issuePhotoFile) {
+      pendingEvidenceUploads.current.set(checkId, { 
+        photoFile: currentCheck.issuePhotoFile, 
+        description: desc 
+      })
+    }
+    
+    setChecklistData(prev => {
+      const newItems = { ...prev.items }
+      if (newItems[itemId]) {
+        newItems[itemId] = {
+          ...newItems[itemId],
+          checks: newItems[itemId].checks.map(check =>
+            check.id === checkId ? { ...check, issueDescription: desc } : check
+          )
+        }
+      }
+      return { ...prev, items: newItems }
+    })
+  }
+
   // Toggle between before/after photo mode
   function togglePhotoMode() {
     setIsAfterPhoto(!isAfterPhoto)
@@ -137,9 +265,31 @@ export default function ReportFormPage() {
 
   // Handle check option selection
   function handleCheckSelection(itemId: string, checkId: string, option: string) {
+    const check = checklistData.items[itemId]?.checks.find(c => c.id === checkId)
+    const options = check?.options || []
+    
     setChecklistData(prev => {
       const newItems = { ...prev.items }
       if (newItems[itemId]) {
+        const existingCheck = newItems[itemId].checks.find(c => c.id === checkId)
+        const wasIssue = existingCheck?.selectedOption && isIssueOption(existingCheck.selectedOption, existingCheck.options)
+        const isNowIssue = isIssueOption(option, options)
+        
+        // If switching from issue to non-issue, clear evidence
+        if (wasIssue && !isNowIssue) {
+          if (prev.items[itemId]) {
+            prev.items[itemId].checks.forEach(c => {
+              if (c.id === checkId) {
+                // Clean up preview URL
+                if (c.issuePhotoPreview) {
+                  URL.revokeObjectURL(c.issuePhotoPreview)
+                }
+              }
+              pendingEvidenceUploads.current.delete(checkId)
+            })
+          }
+        }
+        
         newItems[itemId] = {
           ...newItems[itemId],
           checks: newItems[itemId].checks.map(check =>
@@ -149,7 +299,7 @@ export default function ReportFormPage() {
       }
       // Recalculate hasIssues
       const hasIssues = Object.values(newItems).some(item =>
-        item.checks.some(check => check.selectedOption && isIssueOption(check.selectedOption))
+        item.checks.some(check => check.selectedOption && isIssueOption(check.selectedOption, check.options))
       )
       return { ...prev, items: newItems, hasIssues }
     })
@@ -167,11 +317,89 @@ export default function ReportFormPage() {
       return
     }
 
+    // Validate all checks have selections
+    const allChecksSelected = Object.values(checklistData.items).every(item =>
+      item.checks.every(check => check.selectedOption)
+    )
+    if (!allChecksSelected) {
+      setSubmitError('Please complete all checklist items')
+      return
+    }
+
+    // Validate evidence for negative/neutral selections
+    const missingEvidence = Object.values(checklistData.items).flatMap(item =>
+      item.checks
+        .filter(check => check.selectedOption && requiresEvidence(check.selectedOption, check.options))
+        .filter(check => !check.issuePhotoFile && !pendingEvidenceUploads.current.has(check.id))
+        .map(check => check.label)
+    )
+    if (missingEvidence.length > 0) {
+      setSubmitError(`Evidence (photo & description) required for: ${missingEvidence.join(', ')}`)
+      return
+    }
+
     setSubmitError('')
     setSubmitting(true)
     setUploadProgress(0)
 
     try {
+      // Collect all evidence photos to upload
+      const evidenceToUpload: Array<{ checkId: string; photoFile: File; description: string }> = []
+      
+      // Get photos from pending uploads map
+      for (const [checkId, evidence] of pendingEvidenceUploads.current) {
+        evidenceToUpload.push({ 
+          checkId, 
+          photoFile: evidence.photoFile, 
+          description: evidence.description 
+        })
+      }
+      
+      // Also check checklist items for existing files
+      for (const item of Object.values(checklistData.items)) {
+        for (const check of item.checks) {
+          if (check.issuePhotoFile && !pendingEvidenceUploads.current.has(check.id)) {
+            evidenceToUpload.push({
+              checkId: check.id,
+              photoFile: check.issuePhotoFile,
+              description: check.issueDescription || ''
+            })
+          }
+        }
+      }
+      
+      const totalPending = evidenceToUpload.length
+      let uploaded = 0
+      
+      // Upload evidence photos
+      for (const evidence of evidenceToUpload) {
+        const compressed = await compressImage(evidence.photoFile)
+        const result = await uploadImage(compressed)
+        
+        // Update checklist data with uploaded URL
+        setChecklistData(prev => {
+          const newItems = { ...prev.items }
+          for (const itemId in newItems) {
+            const checkIndex = newItems[itemId].checks.findIndex(c => c.id === evidence.checkId)
+            if (checkIndex !== -1) {
+              newItems[itemId] = {
+                ...newItems[itemId],
+                checks: newItems[itemId].checks.map((c, i) =>
+                  i === checkIndex ? { ...c, issuePhotoUrl: result.url, issuePhotoFile: undefined, issuePhotoPreview: undefined, issueDescription: evidence.description } : c
+                )
+              }
+              break
+            }
+          }
+          return { ...prev, items: newItems }
+        })
+        
+        uploaded++
+        setUploadProgress(Math.round((uploaded / (totalPending + 1)) * 50 + 50))
+      }
+
+      const finalChecklist = checklistData
+      
       await createReport(
         {
           areaId: scanResult.areaId,
@@ -181,7 +409,7 @@ export default function ReportFormPage() {
           gpsLat: scanResult.gpsLat,
           gpsLng: scanResult.gpsLng,
           sessionId: scanResult.sessionId,
-          checklistData: checklistData
+          checklistData: finalChecklist
         },
         appUser.uid,
         setUploadProgress
@@ -378,7 +606,7 @@ export default function ReportFormPage() {
                     <p className="text-factory-accent text-xs">{item.code}</p>
                   </div>
                   <div className="w-8 h-8 flex items-center justify-center rounded-full">
-                    {item.checks.every(check => check.selectedOption && !isIssueOption(check.selectedOption)) ? (
+                    {item.checks.every(check => check.selectedOption && !isIssueOption(check.selectedOption, check.options)) ? (
                       <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -387,36 +615,104 @@ export default function ReportFormPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     )}
-                  </div>
+</div>
                 </div>
 
                 <div className="space-y-3">
-                  {item.checks.sort((a, b) => (a.order || 0) - (b.order || 0)).map(check => (
-                    <div key={check.id} className="flex flex-col gap-2">
-                      <span className="text-white text-sm font-medium">{check.label}</span>
-                      <div className="flex flex-wrap gap-2">
-                        {check.options.map(option => {
-                          const isSelected = check.selectedOption === option
-                          const isIssue = isIssueOption(option)
-                          return (
-                            <button
-                              key={option}
-                              onClick={() => handleCheckSelection(item.id, check.id, option)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors min-h-[44px] ${
-                                isSelected
-                                  ? isIssue
-                                    ? 'bg-red-900/50 text-red-300 border border-red-800'
-                                    : 'bg-green-900/50 text-green-300 border border-green-800'
-                                  : 'bg-factory-border/30 text-factory-muted border border-factory-border'
-                              }`}
-                            >
-                              {option}
-                            </button>
-                          )
-                        })}
+                  {item.checks.sort((a, b) => (a.order || 0) - (b.order || 0)).map(check => {
+                    const showEvidence = check.selectedOption && requiresEvidence(check.selectedOption, check.options)
+
+                    return (
+                      <div key={check.id} className="flex flex-col gap-2">
+                        <span className="text-white text-sm font-medium">{check.label}</span>
+                        <div className="flex flex-wrap gap-2">
+                          {check.options.map(option => {
+                            const isSelected = check.selectedOption === option
+                            const optStatus = getOptionStatus(option, check.options)
+                            return (
+                              <button
+                                key={option}
+                                onClick={() => handleCheckSelection(item.id, check.id, option)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors min-h-[44px] ${
+                                      getOptionButtonStyle(isSelected, optStatus)
+                                    }`}
+                              >
+                                {option}
+                              </button>
+                            )
+                          })}
+                        </div>
+
+                        {/* Evidence section - show only for negative/neutral options */}
+                        {showEvidence && (
+                          <div className="mt-2 p-3 bg-factory-border/20 rounded-lg space-y-3">
+                            {/* Photo capture */}
+                            <div>
+                              <span className="text-xs text-yellow-400 block mb-1">Evidence Photo Required</span>
+                              {check.issuePhotoPreview ? (
+                                <div className="relative rounded-lg overflow-hidden bg-factory-card border border-factory-border max-w-xs">
+                                  <img
+                                    src={check.issuePhotoPreview}
+                                    alt="Evidence"
+                                    className="w-full max-h-32 object-cover"
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      setChecklistData(prev => {
+                                        const newItems = { ...prev.items }
+                                        if (newItems[item.id]) {
+                                          newItems[item.id] = {
+                                            ...newItems[item.id],
+                                            checks: newItems[item.id].checks.map(c =>
+                                              c.id === check.id
+                                                ? { ...c, issuePhotoPreview: undefined, issuePhotoFile: undefined, issuePhotoUrl: undefined }
+                                                : c
+                                            )
+                                          }
+                                        }
+                                        return { ...prev, items: newItems }
+                                      })
+                                      pendingEvidenceUploads.current.delete(check.id)
+                                    }}
+                                    className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              ) : (
+                                <motion.button
+                                  whileTap={{ scale: 0.97 }}
+                                  onClick={() => void handleTakeCheckPhoto(item.id, check.id)}
+                                  className="bg-factory-accent/20 hover:bg-factory-accent/30 text-factory-accent text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 min-h-[44px]"
+                                >
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                                  </svg>
+                                  Take Evidence Photo
+                                </motion.button>
+                              )}
+                            </div>
+
+                            {/* Description */}
+                            <div>
+                              <span className="text-xs text-yellow-400 block mb-1">Abnormality Description</span>
+                              <textarea
+                                value={check.issueDescription || ''}
+                                onChange={e => handleCheckDescription(item.id, check.id, e.target.value)}
+                                rows={2}
+                                maxLength={300}
+                                placeholder="Describe the abnormality..."
+                                className="w-full bg-factory-card border border-factory-border rounded-lg px-3 py-2 text-white placeholder-factory-muted focus:outline-none focus:border-yellow-500 transition-colors resize-none text-xs"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </motion.div>
             ))}
