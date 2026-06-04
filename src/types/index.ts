@@ -45,10 +45,15 @@ export interface CheckItem {
     options: string[]  // Dynamic options like "Baik", "Rusak", "Sesuai", "Tidak Sesuai"
     selectedOption?: string  // The selected option label
     order?: number  // Display order
+    // Before/Issue evidence (for negative/neutral)
     issuePhotoUrl?: string  // Photo for issue (negative/neutral option)
     issueDescription?: string  // Description for issue
     issuePhotoFile?: File  // Photo file for upload (transient)
     issuePhotoPreview?: string  // Photo preview URL (transient)
+    // After/Fix evidence (for after the issue is fixed)
+    afterPhotoUrl?: string  // Photo showing the fix/cleanup
+    afterPhotoFile?: File  // After photo file for upload (transient)
+    afterPhotoPreview?: string  // After photo preview URL (transient)
 }
 
 export interface Item {
@@ -79,9 +84,6 @@ export interface Report {
     areaName?: string
     workerUid: string
     workerName?: string
-    beforePhotoUrl?: string
-    afterPhotoUrl?: string
-    description: string
     status: ReportStatus
     gpsLat?: number
     gpsLng?: number
@@ -93,9 +95,6 @@ export interface Report {
 
 export interface CreateReportInput {
     areaId: string
-    beforePhotoFile?: File
-    afterPhotoFile?: File
-    description: string
     gpsLat?: number
     gpsLng?: number
     sessionId: string

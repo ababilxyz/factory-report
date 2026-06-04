@@ -57,6 +57,37 @@ export default function AdminDashboard() {
     { label: 'Resolved', value: 'resolved' }
   ]
 
+  // Get first issue photo from checklist
+  function getFirstIssuePhoto(checklistData: any): string | null {
+    if (!checklistData?.items) return null
+    for (const itemId in checklistData.items) {
+      for (const check of checklistData.items[itemId].checks) {
+        if (check.issuePhotoUrl) return check.issuePhotoUrl
+      }
+    }
+    return null
+  }
+
+  // Get issue count
+  function getIssueCount(checklistData: any): number {
+    if (!checklistData?.items) return 0
+    let count = 0
+    for (const itemId in checklistData.items) {
+      for (const check of checklistData.items[itemId].checks) {
+        const options = check.options || []
+        const selectedOption = check.selectedOption
+        if (selectedOption) {
+          const index = options.indexOf(selectedOption)
+          const isIssue = options.length === 2 
+            ? index === 1 
+            : (options.length === 3 ? index >= 1 : index === options.length - 1)
+          if (isIssue) count++
+        }
+      }
+    }
+    return count
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -137,36 +168,42 @@ export default function AdminDashboard() {
           </div>
         ) : (
           <div className="space-y-3">
-            {reports.map(report => (
-              <motion.div
-                key={report.reportId}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setSelectedReport(report)}
-                className="bg-factory-card border border-factory-border rounded-2xl p-4 cursor-pointer hover:border-factory-accent/50 transition-colors"
-              >
-                <div className="flex gap-3">
-                {report.beforePhotoUrl && (
-                    <img
-                        src={report.beforePhotoUrl}
-                        alt="Issue"
-                        className="w-16 h-16 rounded-xl object-cover flex-shrink-0 bg-factory-border"
-                    />
-                )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-white font-medium text-sm truncate">{report.areaName || report.areaId}</p>
-                      <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[report.status]}`}>
-                        {STATUS_LABELS[report.status]}
-                      </span>
+            {reports.map(report => {
+              const issuePhoto = getFirstIssuePhoto(report.checklistData)
+              const issueCount = getIssueCount(report.checklistData)
+              return (
+                <motion.div
+                  key={report.reportId}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setSelectedReport(report)}
+                  className="bg-factory-card border border-factory-border rounded-2xl p-4 cursor-pointer hover:border-factory-accent/50 transition-colors"
+                >
+                  <div className="flex gap-3">
+                    {issuePhoto && (
+                      <img
+                          src={issuePhoto}
+                          alt="Issue"
+                          className="w-16 h-16 rounded-xl object-cover flex-shrink-0 bg-factory-border"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-white font-medium text-sm truncate">{report.areaName || report.areaId}</p>
+                        <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[report.status]}`}>
+                          {STATUS_LABELS[report.status]}
+                        </span>
+                      </div>
+                      <p className="text-factory-muted text-sm mt-1">
+                        {issueCount > 0 ? `${issueCount} issue(s) found` : 'No issues'}
+                      </p>
+                      <p className="text-factory-muted/60 text-xs mt-1.5">{timeAgo(report.timestamp)}</p>
                     </div>
-                    <p className="text-factory-muted text-sm mt-1 line-clamp-2">{report.description}</p>
-                    <p className="text-factory-muted/60 text-xs mt-1.5">{timeAgo(report.timestamp)}</p>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              )
+            })}
           </div>
         )}
       </main>
@@ -201,12 +238,12 @@ export default function AdminDashboard() {
 
               <div className="p-4 space-y-4">
                  <AnimatePresence>
-                   {selectedReport.beforePhotoUrl && (
+                   {getFirstIssuePhoto(selectedReport.checklistData) && (
                      <motion.img
                        key="photo"
                        initial={{ opacity: 0, scale: 0.95 }}
                        animate={{ opacity: 1, scale: 1 }}
-                       src={selectedReport.beforePhotoUrl}
+                       src={getFirstIssuePhoto(selectedReport.checklistData)!}
                        alt="Issue"
                        className="w-full rounded-xl object-cover max-h-48"
                      />
@@ -246,10 +283,39 @@ export default function AdminDashboard() {
                   </motion.div>
                 </div>
 
-                <div>
-                  <p className="text-factory-muted text-sm mb-1">Description</p>
-                  <p className="text-white text-sm bg-factory-dark rounded-xl p-3">{selectedReport.description}</p>
-                </div>
+                {/* Checklist details */}
+                {selectedReport.checklistData && (
+                  <div>
+                    <p className="text-factory-muted text-sm mb-2">Checklist Items</p>
+                    <div className="space-y-2">
+                      {Object.values(selectedReport.checklistData.items).map(item => (
+                        <div key={item.id} className="p-2 bg-factory-dark/50 rounded-lg">
+                          <p className="text-factory-accent text-xs font-medium">{item.name}</p>
+                          {item.checks.map(check => {
+                            const hasIssue = check.issuePhotoUrl
+                            const hasAfter = check.afterPhotoUrl
+                            return (
+                              <div key={check.id} className="flex items-center justify-between text-xs py-1">
+                                <span className="text-white truncate">{check.label}</span>
+                                <div className="flex items-center gap-1">
+                                  {hasIssue && (
+                                    <span className="text-red-400 text-xs">Before</span>
+                                  )}
+                                  {hasAfter && (
+                                    <span className="text-green-400 text-xs">After</span>
+                                  )}
+                                  <span className="text-factory-muted">
+                                    {check.selectedOption || '-'}
+                                  </span>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Status update actions */}
                 <div className="flex gap-2">

@@ -115,6 +115,25 @@ function getOptionButtonStyle(
   }
 }
 
+// Get after photo button style based on status
+function getAfterPhotoButtonStyle(
+  hasAfterPhoto: boolean,
+  status: "positive" | "neutral" | "negative",
+) {
+  const baseStyle = hasAfterPhoto
+    ? "bg-green-900/50 text-green-300 border border-green-800"
+    : "bg-factory-accent/20 hover:bg-factory-accent/30 text-factory-accent";
+
+  // For pending status, show orange
+  if (status === "neutral") {
+    return hasAfterPhoto
+      ? "bg-yellow-900/50 text-yellow-300 border border-yellow-800"
+      : "bg-factory-accent/20 hover:bg-factory-accent/30 text-factory-accent";
+  }
+
+  return baseStyle;
+}
+
 export default function ReportFormPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -122,24 +141,12 @@ export default function ReportFormPage() {
 
   const scanResult = location.state?.scanResult as ScanResult | undefined;
 
-  // State for before/after photos
-  const [beforePhoto, setBeforePhoto] = useState<File | null>(null);
-  const [afterPhoto, setAfterPhoto] = useState<File | null>(null);
-  const [beforePhotoPreview, setBeforePhotoPreview] = useState<string | null>(
-    null,
-  );
-  const [afterPhotoPreview, setAfterPhotoPreview] = useState<string | null>(
-    null,
-  );
-  const [isAfterPhoto, setIsAfterPhoto] = useState(false);
-
-  // Cleanup preview URLs on unmount to prevent memory leaks
-  useEffect(() => {
-    return () => {
-      if (beforePhotoPreview) URL.revokeObjectURL(beforePhotoPreview);
-      if (afterPhotoPreview) URL.revokeObjectURL(afterPhotoPreview);
-    };
-  }, [beforePhotoPreview, afterPhotoPreview]);
+  // State for checklist
+  const [checklistData, setChecklistData] = useState<ChecklistData>({
+    areaId: "",
+    items: {},
+    hasIssues: false,
+  });
 
   // Cleanup check-level preview URLs on unmount
   useEffect(() => {
@@ -149,18 +156,13 @@ export default function ReportFormPage() {
           if (check.issuePhotoPreview) {
             URL.revokeObjectURL(check.issuePhotoPreview);
           }
+          if (check.afterPhotoPreview) {
+            URL.revokeObjectURL(check.afterPhotoPreview);
+          }
         });
       });
     };
   }, []);
-
-  // State for description and checklist
-  const [description, setDescription] = useState("");
-  const [checklistData, setChecklistData] = useState<ChecklistData>({
-    areaId: "",
-    items: {},
-    hasIssues: false,
-  });
 
   // Load checklist when scanResult changes
   useEffect(() => {
@@ -181,6 +183,8 @@ export default function ReportFormPage() {
   const pendingEvidenceUploads = useRef<
     Map<string, { photoFile: File; description: string }>
   >(new Map());
+  // Track pending after photo uploads
+  const pendingAfterUploads = useRef<Map<string, File>>(new Map());
 
   // Redirect if no scan result
   useEffect(() => {
@@ -201,29 +205,8 @@ export default function ReportFormPage() {
     }
   }, [checklistData.items]);
 
-  // Handle taking photo (before or after)
-  async function handleTakePhoto() {
-    try {
-      const file = await openCameraCapture();
-
-      if (isAfterPhoto) {
-        setAfterPhoto(file);
-        const url = URL.createObjectURL(file);
-        setAfterPhotoPreview(url);
-      } else {
-        setBeforePhoto(file);
-        const url = URL.createObjectURL(file);
-        setBeforePhotoPreview(url);
-      }
-    } catch (err) {
-      if (err instanceof Error && err.message !== "Camera cancelled") {
-        setSubmitError("Could not access camera. " + err.message);
-      }
-    }
-  }
-
-  // Handle taking photo for check item evidence
-  async function handleTakeCheckPhoto(itemId: string, checkId: string) {
+  // Handle taking photo for check item evidence (before/issue)
+  async function handleTakeIssuePhoto(itemId: string, checkId: string) {
     try {
       const file = await openCameraCapture();
 
@@ -249,6 +232,39 @@ export default function ReportFormPage() {
             checks: newItems[itemId].checks.map((check) =>
               check.id === checkId
                 ? { ...check, issuePhotoPreview: url, issuePhotoFile: file }
+                : check,
+            ),
+          };
+        }
+        return { ...prev, items: newItems };
+      });
+    } catch (err) {
+      if (err instanceof Error && err.message !== "Camera cancelled") {
+        setSubmitError("Could not access camera. " + err.message);
+      }
+    }
+  }
+
+  // Handle taking after photo for check item (fix/cleanup)
+  async function handleTakeAfterPhoto(itemId: string, checkId: string) {
+    try {
+      const file = await openCameraCapture();
+
+      // Store in pending uploads map
+      pendingAfterUploads.current.set(checkId, file);
+
+      // Create preview URL
+      const url = URL.createObjectURL(file);
+
+      // Update checklist with preview
+      setChecklistData((prev) => {
+        const newItems = { ...prev.items };
+        if (newItems[itemId]) {
+          newItems[itemId] = {
+            ...newItems[itemId],
+            checks: newItems[itemId].checks.map((check) =>
+              check.id === checkId
+                ? { ...check, afterPhotoPreview: url, afterPhotoFile: file }
                 : check,
             ),
           };
@@ -291,11 +307,6 @@ export default function ReportFormPage() {
       }
       return { ...prev, items: newItems };
     });
-  }
-
-  // Toggle between before/after photo mode
-  function togglePhotoMode() {
-    setIsAfterPhoto(!isAfterPhoto);
   }
 
   // Handle check option selection
@@ -355,16 +366,8 @@ export default function ReportFormPage() {
   }
 
   async function handleSubmit() {
-    if (!beforePhoto || !description.trim() || !scanResult || !appUser) {
-      setSubmitError(
-        'Please provide description and take at least the "before" photo',
-      );
-      return;
-    }
-
-    const hasIssues = checklistData.hasIssues;
-    if (hasIssues && !afterPhoto) {
-      setSubmitError('Please take an "after" photo showing the fix/cleanup');
+    if (!scanResult || !appUser) {
+      setSubmitError("Please scan a QR code to submit a report");
       return;
     }
 
@@ -395,7 +398,7 @@ export default function ReportFormPage() {
       );
     if (missingEvidence.length > 0) {
       setSubmitError(
-        `Evidence (photo & description) required for: ${missingEvidence.join(", ")}`,
+        `Evidence photo required for: ${missingEvidence.join(", ")}`,
       );
       return;
     }
@@ -419,13 +422,36 @@ export default function ReportFormPage() {
       return;
     }
 
+    // Validate after photo for negative/neutral selections
+    const missingAfterPhoto = Object.values(checklistData.items)
+      .flatMap((item) =>
+        item.checks
+          .filter(
+            (check) =>
+              check.selectedOption &&
+              requiresEvidence(check.selectedOption, check.options),
+          )
+          .filter(
+            (check) =>
+              !check.afterPhotoFile &&
+              !pendingAfterUploads.current.has(check.id),
+          )
+          .map((check) => check.label),
+      );
+    if (missingAfterPhoto.length > 0) {
+      setSubmitError(
+        `After photo required for: ${missingAfterPhoto.join(", ")}`,
+      );
+      return;
+    }
+
     setSubmitError("");
     setSubmitting(true);
     setUploadProgress(0);
 
     try {
-      // Collect all evidence photos to upload
-      const evidenceToUpload: Array<{
+      // Collect all evidence photos to upload (issue photos)
+      const issuePhotosToUpload: Array<{
         checkId: string;
         photoFile: File;
         description: string;
@@ -433,7 +459,7 @@ export default function ReportFormPage() {
 
       // Get photos from pending uploads map
       for (const [checkId, evidence] of pendingEvidenceUploads.current) {
-        evidenceToUpload.push({
+        issuePhotosToUpload.push({
           checkId,
           photoFile: evidence.photoFile,
           description: evidence.description,
@@ -447,7 +473,7 @@ export default function ReportFormPage() {
             check.issuePhotoFile &&
             !pendingEvidenceUploads.current.has(check.id)
           ) {
-            evidenceToUpload.push({
+            issuePhotosToUpload.push({
               checkId: check.id,
               photoFile: check.issuePhotoFile,
               description: check.issueDescription || "",
@@ -456,11 +482,35 @@ export default function ReportFormPage() {
         }
       }
 
-      const totalPending = evidenceToUpload.length;
+      // Collect all after photos to upload
+      const afterPhotosToUpload: Array<{
+        checkId: string;
+        photoFile: File;
+      }> = [];
+
+      for (const [checkId, photoFile] of pendingAfterUploads.current) {
+        afterPhotosToUpload.push({ checkId, photoFile });
+      }
+
+      for (const item of Object.values(checklistData.items)) {
+        for (const check of item.checks) {
+          if (
+            check.afterPhotoFile &&
+            !pendingAfterUploads.current.has(check.id)
+          ) {
+            afterPhotosToUpload.push({
+              checkId: check.id,
+              photoFile: check.afterPhotoFile,
+            });
+          }
+        }
+      }
+
+      const totalPending = issuePhotosToUpload.length + afterPhotosToUpload.length;
       let uploaded = 0;
 
-      // Upload evidence photos
-      for (const evidence of evidenceToUpload) {
+      // Upload issue photos
+      for (const evidence of issuePhotosToUpload) {
         const compressed = await compressImage(evidence.photoFile);
         const result = await uploadImage(compressed);
 
@@ -493,9 +543,43 @@ export default function ReportFormPage() {
         });
 
         uploaded++;
-        setUploadProgress(
-          Math.round((uploaded / (totalPending + 1)) * 50 + 50),
-        );
+        setUploadProgress(Math.round((uploaded / totalPending) * 50));
+      }
+
+      // Upload after photos
+      for (const after of afterPhotosToUpload) {
+        const compressed = await compressImage(after.photoFile);
+        const result = await uploadImage(compressed);
+
+        // Update checklist data with uploaded URL
+        setChecklistData((prev) => {
+          const newItems = { ...prev.items };
+          for (const itemId in newItems) {
+            const checkIndex = newItems[itemId].checks.findIndex(
+              (c) => c.id === after.checkId,
+            );
+            if (checkIndex !== -1) {
+              newItems[itemId] = {
+                ...newItems[itemId],
+                checks: newItems[itemId].checks.map((c, i) =>
+                  i === checkIndex
+                    ? {
+                        ...c,
+                        afterPhotoUrl: result.url,
+                        afterPhotoFile: undefined,
+                        afterPhotoPreview: undefined,
+                      }
+                    : c,
+                ),
+              };
+              break;
+            }
+          }
+          return { ...prev, items: newItems };
+        });
+
+        uploaded++;
+        setUploadProgress(Math.round((uploaded / totalPending) * 50 + 50));
       }
 
       const finalChecklist = checklistData;
@@ -503,16 +587,12 @@ export default function ReportFormPage() {
       await createReport(
         {
           areaId: scanResult.areaId,
-          beforePhotoFile: beforePhoto ?? undefined,
-          afterPhotoFile: afterPhoto ?? undefined,
-          description: description.trim(),
           gpsLat: scanResult.gpsLat,
           gpsLng: scanResult.gpsLng,
           sessionId: scanResult.sessionId,
           checklistData: finalChecklist,
         },
         appUser.uid,
-        setUploadProgress,
       );
       setSubmitted(true);
     } catch (err) {
@@ -625,127 +705,6 @@ export default function ReportFormPage() {
       )}
 
       <main className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Photo Section */}
-        <div>
-          <label className="block text-sm font-medium text-white mb-2">
-            {isAfterPhoto
-              ? "After Photo (Fix/Cleanup)"
-              : "Before Photo (Issue)"}
-            <span className="text-red-400">*</span>
-          </label>
-
-          {(isAfterPhoto ? afterPhotoPreview : beforePhotoPreview) ? (
-            <motion.div
-              key="preview"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="relative rounded-2xl overflow-hidden bg-factory-card border border-factory-border"
-            >
-              <img
-                src={isAfterPhoto ? afterPhotoPreview! : beforePhotoPreview!}
-                alt={isAfterPhoto ? "After" : "Before"}
-                className="w-full max-h-64 object-cover"
-              />
-
-              {!isAfterPhoto && beforePhotoPreview && afterPhotoPreview ? (
-                <div className="absolute top-3 right-3 flex gap-2">
-                  <img
-                    src={beforePhotoPreview}
-                    alt="Before"
-                    className="w-10 h-10 rounded object-cover border border-factory-border"
-                  />
-                  <img
-                    src={afterPhotoPreview}
-                    alt="After"
-                    className="w-10 h-10 rounded object-cover border border-factory-border"
-                  />
-                </div>
-              ) : null}
-
-              <motion.button
-                whileTap={{ scale: 0.9 }}
-                onClick={() => void handleTakePhoto()}
-                className="absolute bottom-3 right-3 bg-black/60 text-white text-sm px-3 py-2 rounded-lg min-h-[44px] flex items-center gap-1.5"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z"
-                  />
-                </svg>
-                {isAfterPhoto ? "Retake After" : "Retake Before"}
-              </motion.button>
-            </motion.div>
-          ) : (
-            <div className="space-y-2">
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                whileHover={{ scale: 1.01 }}
-                onClick={() => void handleTakePhoto()}
-                className="w-full bg-factory-card border-2 border-dashed border-factory-border hover:border-factory-accent rounded-2xl p-8 flex flex-col items-center gap-3 text-factory-muted hover:text-factory-accent transition-colors"
-              >
-                <svg
-                  className="w-10 h-10"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"
-                  />
-                </svg>
-                <span className="font-medium">
-                  {isAfterPhoto ? "Take After Photo" : "Take Before Photo"}
-                </span>
-              </motion.button>
-
-              {/* Show toggle button when we have a before photo but not after, or vice versa */}
-              {(beforePhotoPreview && !afterPhotoPreview) ||
-              (!beforePhotoPreview && afterPhotoPreview) ? (
-                <motion.button
-                  whileTap={{ scale: 0.9 }}
-                  onClick={togglePhotoMode}
-                  className="w-full text-factory-muted hover:text-white text-sm px-3 py-2 rounded border border-factory-border transition-colors"
-                >
-                  {isAfterPhoto ? "Retake Before Photo" : "Take After Photo"}
-                </motion.button>
-              ) : null}
-            </div>
-          )}
-
-          {checklistData.hasIssues && !afterPhoto && (
-            <div className="mt-2 text-factory-accent text-sm">
-              ⚠️ Issues found - after photo showing fix/cleanup is required
-            </div>
-          )}
-
-          {!checklistData.hasIssues && afterPhoto && (
-            <div className="mt-2 text-factory-accent text-sm">
-              ℹ️ No issues found - after photo is optional
-            </div>
-          )}
-        </div>
-
         {/* Checklist Section */}
         <div>
           <label className="block text-sm font-medium text-white mb-2">
@@ -810,6 +769,9 @@ export default function ReportFormPage() {
                       const showEvidence =
                         check.selectedOption &&
                         requiresEvidence(check.selectedOption, check.options);
+                      const optStatus = check.selectedOption
+                        ? getOptionStatus(check.selectedOption, check.options)
+                        : "positive";
 
                       return (
                         <div key={check.id} className="flex flex-col gap-2">
@@ -848,10 +810,10 @@ export default function ReportFormPage() {
                           {/* Evidence section - show only for negative/neutral options */}
                           {showEvidence && (
                             <div className="mt-2 p-3 bg-factory-border/20 rounded-lg space-y-3">
-                              {/* Photo capture */}
+                              {/* Issue/Before Photo capture */}
                               <div>
-                                <span className="text-xs text-yellow-400 block mb-1">
-                                  Evidence Photo Required
+                                <span className="text-xs text-red-400 block mb-1">
+                                  Before Photo (Abnormality)
                                 </span>
                                 {check.issuePhotoPreview ? (
                                   <div className="relative rounded-lg overflow-hidden bg-factory-card border border-factory-border max-w-xs">
@@ -909,7 +871,7 @@ export default function ReportFormPage() {
                                   <motion.button
                                     whileTap={{ scale: 0.97 }}
                                     onClick={() =>
-                                      void handleTakeCheckPhoto(
+                                      void handleTakeIssuePhoto(
                                         item.id,
                                         check.id,
                                       )
@@ -934,7 +896,7 @@ export default function ReportFormPage() {
                                         d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"
                                       />
                                     </svg>
-                                    Take Evidence Photo
+                                    Take Before Photo
                                   </motion.button>
                                 )}
                               </div>
@@ -959,6 +921,100 @@ export default function ReportFormPage() {
                                   className="w-full bg-factory-card border border-factory-border rounded-lg px-3 py-2 text-white placeholder-factory-muted focus:outline-none focus:border-yellow-500 transition-colors resize-none text-xs"
                                 />
                               </div>
+
+                              {/* After/Fix Photo capture */}
+                              <div>
+                                <span className="text-xs text-green-400 block mb-1">
+                                  After Photo (Fix/Completed)
+                                </span>
+                                {check.afterPhotoPreview ? (
+                                  <div className="relative rounded-lg overflow-hidden bg-factory-card border border-factory-border max-w-xs">
+                                    <img
+                                      src={check.afterPhotoPreview}
+                                      alt="After"
+                                      className="w-full max-h-32 object-cover"
+                                    />
+                                    <button
+                                      onClick={() => {
+                                        setChecklistData((prev) => {
+                                          const newItems = { ...prev.items };
+                                          if (newItems[item.id]) {
+                                            newItems[item.id] = {
+                                              ...newItems[item.id],
+                                              checks: newItems[
+                                                item.id
+                                              ].checks.map((c) =>
+                                                c.id === check.id
+                                                  ? {
+                                                      ...c,
+                                                      afterPhotoPreview:
+                                                        undefined,
+                                                      afterPhotoFile: undefined,
+                                                      afterPhotoUrl: undefined,
+                                                    }
+                                                  : c,
+                                              ),
+                                            };
+                                          }
+                                          return { ...prev, items: newItems };
+                                        });
+                                        pendingAfterUploads.current.delete(
+                                          check.id,
+                                        );
+                                      }}
+                                      className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded"
+                                    >
+                                      <svg
+                                        className="w-3 h-3"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={2}
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          d="M6 18L18 6M6 6l12 12"
+                                        />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <motion.button
+                                    whileTap={{ scale: 0.97 }}
+                                    onClick={() =>
+                                      void handleTakeAfterPhoto(
+                                        item.id,
+                                        check.id,
+                                      )
+                                    }
+                                    className={`text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 min-h-[44px] ${getAfterPhotoButtonStyle(
+                                      !!check.afterPhotoUrl,
+                                      optStatus,
+                                    )}`}
+                                  >
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"
+                                      />
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"
+                                      />
+                                    </svg>
+                                    Take After Photo
+                                  </motion.button>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -968,28 +1024,6 @@ export default function ReportFormPage() {
               </motion.div>
             ))}
           </div>
-        </div>
-
-        {/* Description */}
-        <div>
-          <label
-            htmlFor="description"
-            className="block text-sm font-medium text-white mb-2"
-          >
-            Description <span className="text-red-400">*</span>
-          </label>
-          <textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={4}
-            maxLength={500}
-            className="w-full bg-factory-card border border-factory-border rounded-xl px-4 py-3 text-white placeholder-factory-muted focus:outline-none focus:border-factory-accent transition-colors resize-none"
-            placeholder="Describe the issue in detail. What is the problem? When did it start?"
-          />
-          <p className="text-factory-muted text-xs mt-1 text-right">
-            {description.length}/500
-          </p>
         </div>
 
         {/* Error */}
@@ -1035,10 +1069,10 @@ export default function ReportFormPage() {
       <div className="p-4 bg-factory-dark border-t border-factory-border">
         <motion.button
           whileTap={{
-            scale: !beforePhoto || !description.trim() || submitting ? 1 : 0.97,
+            scale: submitting ? 1 : 0.97,
           }}
           onClick={() => void handleSubmit()}
-          disabled={!beforePhoto || !description.trim() || submitting}
+          disabled={submitting}
           className="w-full bg-factory-accent hover:bg-factory-accent-light disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl py-4 transition-colors min-h-[52px] flex items-center justify-center gap-2"
         >
           {submitting ? (

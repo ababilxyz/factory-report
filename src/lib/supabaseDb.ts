@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { v4 as uuidv4 } from 'uuid'
-import type { AppUser, Area, Report, CreateReportInput, ReportStatus, Item } from '../types'
+import type { AppUser, Area, Report, CreateReportInput, ReportStatus, Item, ChecklistData, CheckItem } from '../types'
 import { uploadImage } from './storage'
 import { compressImage } from '../utils/imageUtils'
 import { getDeviceFingerprint } from '../utils/deviceFingerprint'
@@ -152,7 +152,6 @@ export async function getChecksByItemId(itemId: string): Promise<ItemCheck[]> {
 export async function createReport(
   input: CreateReportInput,
   workerUid: string,
-  onProgress?: (percent: number) => void
 ): Promise<string> {
   const reportId = uuidv4()
   const deviceId = await getDeviceFingerprint()
@@ -160,31 +159,6 @@ export async function createReport(
   // Fetch item to get areaId for area name lookup
   const item = await getItem(input.areaId)
   const area = item ? await getArea(item.areaId || '') : null
-
-  // Compress and upload images (optional)
-  let beforePhotoUrl: string | undefined
-  let afterPhotoUrl: string | undefined
-
-  // Track total progress for both photos
-  let totalProgress = 0
-
-  if (input.beforePhotoFile) {
-    const compressed = await compressImage(input.beforePhotoFile)
-    const result = await uploadImage(compressed, (percent) => {
-      totalProgress = Math.round(percent * 0.5)
-      if (onProgress) onProgress(totalProgress)
-    })
-    beforePhotoUrl = result.url
-  }
-
-  if (input.afterPhotoFile) {
-    const compressed = await compressImage(input.afterPhotoFile)
-    const result = await uploadImage(compressed, (percent) => {
-      totalProgress = 50 + Math.round(percent * 0.5)
-      if (onProgress) onProgress(totalProgress)
-    })
-    afterPhotoUrl = result.url
-  }
 
   // Store areaId in report (itemId is passed as areaId for backward compatibility)
   // We need to fetch the parent area for the actual area reference
@@ -198,7 +172,6 @@ export async function createReport(
     area_id: actualAreaId,
     area_name: area?.name,
     worker_uid: workerUid,
-    description: input.description,
     status: 'pending',
     gps_lat: input.gpsLat,
     gps_lng: input.gpsLng,
@@ -207,8 +180,6 @@ export async function createReport(
     session_id: input.sessionId
   }
 
-  if (beforePhotoUrl) report.before_photo_url = beforePhotoUrl
-  if (afterPhotoUrl) report.after_photo_url = afterPhotoUrl
   if (input.checklistData) report.checklist_data = input.checklistData
 
   const { error } = await supabase
@@ -217,6 +188,80 @@ export async function createReport(
 
   if (error) throw error
   return reportId
+}
+
+// Update after photo for a specific check in an existing report
+export async function updateCheckAfterPhoto(
+  reportId: string,
+  checkId: string,
+  afterPhotoFile: File,
+  onProgress?: (percent: number) => void
+): Promise<void> {
+  // Get existing report
+  const { data: existingReport, error: fetchError } = await supabase
+    .from('reports')
+    .select('checklist_data')
+    .eq('report_id', reportId)
+    .single()
+
+  if (fetchError || !existingReport) {
+    throw new Error('Report not found')
+  }
+
+  // Upload the after photo
+  const compressed = await compressImage(afterPhotoFile)
+  const result = await uploadImage(compressed, onProgress)
+
+  // Update the checklist data with the after photo URL
+  const checklistData = existingReport.checklist_data as ChecklistData
+  if (!checklistData || !checklistData.items) {
+    throw new Error('Invalid checklist data')
+  }
+
+  // Find and update the check
+  for (const itemId in checklistData.items) {
+    const checkIndex = checklistData.items[itemId].checks.findIndex(
+      (c: CheckItem) => c.id === checkId,
+    )
+    if (checkIndex !== -1) {
+      checklistData.items[itemId].checks[checkIndex].afterPhotoUrl = result.url
+      checklistData.items[itemId].checks[checkIndex].afterPhotoFile = undefined
+      checklistData.items[itemId].checks[checkIndex].afterPhotoPreview = undefined
+      break
+    }
+  }
+
+  // Check if all checks now have after photos - update hasIssues accordingly
+  let allResolved = true
+  for (const itemId in checklistData.items) {
+    for (const check of checklistData.items[itemId].checks) {
+      const options = check.options || []
+      const selectedOption = check.selectedOption
+      if (selectedOption) {
+        const index = options.indexOf(selectedOption)
+        const isIssue = options.length === 2 
+          ? index === 1 
+          : (options.length === 3 ? index >= 1 : index === options.length - 1)
+        if (isIssue && !check.afterPhotoUrl) {
+          allResolved = false
+          break
+        }
+      }
+    }
+    if (!allResolved) break
+  }
+
+  // Update the report with modified checklist data
+  const { error: updateError } = await supabase
+    .from('reports')
+    .update({
+      checklist_data: checklistData,
+      status: allResolved ? 'resolved' : 'pending',
+      updated_at: Date.now(),
+    })
+    .eq('report_id', reportId)
+
+  if (updateError) throw updateError
 }
 
 export async function getReports(
@@ -242,9 +287,6 @@ export async function getReports(
     areaName: d.area_name,
     workerUid: d.worker_uid,
     workerName: d.worker_name,
-    beforePhotoUrl: d.before_photo_url,
-    afterPhotoUrl: d.after_photo_url,
-    description: d.description,
     status: d.status,
     gpsLat: d.gps_lat,
     gpsLng: d.gps_lng,
@@ -270,9 +312,6 @@ export async function getReportsByWorkerId(workerUid: string, limitCount = 50): 
     areaName: d.area_name,
     workerUid: d.worker_uid,
     workerName: d.worker_name,
-    beforePhotoUrl: d.before_photo_url,
-    afterPhotoUrl: d.after_photo_url,
-    description: d.description,
     status: d.status,
     gpsLat: d.gps_lat,
     gpsLng: d.gps_lng,
