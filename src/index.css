@@ -1,0 +1,64 @@
+/* stylelint-disable at-rule-no-unknown */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+/* stylelint-enable at-rule-no-unknown */
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
+  }
+
+  html {
+    height: 100%;
+    /* Prevent overscroll bounce on iOS */
+    overscroll-behavior: none;
+  }
+
+  body {
+    height: 100%;
+    background-color: #0d0d1a;
+    color: white;
+    font-family: 'Inter', system-ui, sans-serif;
+    /* Safe area insets for notched phones */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  #root {
+    height: 100%;
+  }
+}
+
+@layer utilities {
+  .pt-safe-top {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+  .pb-safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+  /* Hide html5-qrcode default UI elements */
+  #qr-reader__header_message,
+  #qr-reader__status_span,
+  #qr-reader__camera_selection,
+  #qr-reader select {
+    display: none !important;
+  }
+  #qr-reader {
+    border: none !important;
+    padding: 0 !important;
+  }
+  #qr-reader video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+  }
+
+  /* Print styles for QR codes */
+  @media print {
+    body { background: white; }
+    header, footer, button, nav { display: none !important; }
+    .bg-white { display: block !important; }
+  }
+}
