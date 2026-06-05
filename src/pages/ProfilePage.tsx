@@ -30,7 +30,7 @@ export default function ProfilePage() {
     try {
       await updateUserProfile(editedProfile.uid, {
         displayName: editedProfile.displayName,
-        email: editedProfile.email
+        email: editedProfile.email,
       })
       setUserProfile({ ...editedProfile })
       setEditing(false)
@@ -43,7 +43,7 @@ export default function ProfilePage() {
 
   function handleInputChange(field: keyof AppUser, value: string) {
     if (!editedProfile) return
-    setEditedProfile(prev => {
+    setEditedProfile((prev) => {
       if (!prev) return prev
       return { ...prev, [field]: value }
     })
@@ -55,166 +55,132 @@ export default function ProfilePage() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="min-h-screen bg-factory-dark flex flex-col"
-    >
-      {/* Header */}
-      <header className="bg-factory-card border-b border-factory-border px-4 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-white font-semibold">Profile</h1>
-          <p className="text-factory-accent text-xs font-medium">Worker Account</p>
+    <div className="min-h-screen bg-[#0f172a] text-slate-100">
+      <header className="border-b border-white/10 bg-[#0f172a]/80">
+        <div className="max-w-3xl mx-auto px-5 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-base font-semibold tracking-tight">Profile</h1>
+            <p className="text-sm text-slate-400 mt-0.5">Worker Account</p>
+          </div>
+          <button
+            onClick={() => navigate('/home')}
+            className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/10 text-slate-400 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
         </div>
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          onClick={() => navigate('/home')}
-          className="w-11 h-11 rounded-xl bg-factory-border/50 flex items-center justify-center text-white"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </motion.button>
       </header>
 
-      {/* Error */}
       {saveError && (
         <motion.div
-          initial={{ opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0 }}
-          className="bg-red-950/50 border border-red-800 text-red-300 text-sm rounded-xl p-3 mx-4 my-4"
+          className="mx-4 mt-4 rounded-xl border border-red-800 bg-red-950/50 text-red-200 text-xs px-3 py-2"
         >
           {saveError}
         </motion.div>
       )}
 
-      <main className="flex-1 overflow-y-auto p-6">
-        {/* Profile Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-factory-card border border-factory-border rounded-2xl p-6"
-        >
-          <div className="space-y-5">
-            {/* Header */}
+      <main className="max-w-3xl mx-auto px-4 py-5 space-y-4">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+          <div className="space-y-4">
             <div className="flex items-center gap-4">
-              {/* Avatar */}
-              <div className="w-16 h-16 rounded-full bg-factory-accent/20 flex items-center justify-center">
-                <svg className="w-8 h-8 text-factory-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <div className="w-14 h-14 rounded-full bg-[#0d9488]/20 flex items-center justify-center">
+                <svg className="w-7 h-7 text-[#0d9488]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
                   <circle cx="12" cy="7" r="4" />
                 </svg>
               </div>
 
               <div className="flex-1">
-                <h2 className="text-white font-bold text-xl">
+                <h2 className="text-white font-semibold tracking-tight">
                   {userProfile?.displayName || 'Worker'}
                 </h2>
-                <p className="text-factory-muted text-sm">
-                  {userProfile?.email || 'No email'}
-                </p>
-                <p className="text-factory-accent text-xs font-medium mt-1">
+                <p className="text-sm text-slate-400">{userProfile?.email || 'No email'}</p>
+                <p className="text-xs text-[#0d9488] font-medium mt-0.5">
                   Role: {userProfile?.role === 'worker' ? 'Field Worker' : 'Administrator'}
                 </p>
               </div>
 
-              {/* Edit Button */}
               {!editing && (
-                <motion.button
-                  whileTap={{ scale: 0.9 }}
+                <button
                   onClick={() => setEditing(true)}
-                  className="text-factory-muted hover:text-white text-sm px-3 py-1 rounded transition-colors"
+                  className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg border border-white/10 hover:border-white/20 transition-colors"
                 >
-                  Edit Profile
-                </motion.button>
+                  Edit
+                </button>
               )}
             </div>
 
-            {/* Form */}
             {editing ? (
-              <form className="space-y-4">
+              <form className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-white mb-2">
-                    Display Name
-                  </label>
+                  <label className="block text-xs text-slate-400 mb-1.5">Display name</label>
                   <input
                     type="text"
                     value={editedProfile?.displayName || ''}
-                    onChange={e => handleInputChange('displayName', e.target.value)}
-                    className="w-full bg-factory-card border border-factory-border rounded-xl px-4 py-3 text-white placeholder-factory-muted focus:outline-none focus:border-factory-accent"
+                    onChange={(e) => handleInputChange('displayName', e.target.value)}
+                    className="w-full rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-[#0d9488] transition-colors"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-white mb-2">
-                    Email
-                  </label>
+                  <label className="block text-xs text-slate-400 mb-1.5">Email</label>
                   <input
                     type="email"
                     value={editedProfile?.email || ''}
-                    onChange={e => handleInputChange('email', e.target.value)}
-                    className="w-full bg-factory-card border border-factory-border rounded-xl px-4 py-3 text-white placeholder-factory-muted focus:outline-none focus:border-factory-accent"
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    className="w-full rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-[#0d9488] transition-colors"
                   />
                 </div>
-
-                <div className="flex gap-3">
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
                     onClick={handleSave}
                     disabled={saving}
-                    className="flex-1 bg-factory-accent hover:bg-factory-accent-light text-white font-semibold rounded-xl py-3 transition-colors disabled:opacity-50"
+                    className="flex-1 rounded-lg bg-[#0d9488] text-white text-sm font-medium py-2.5 hover:bg-[#0d9488]/90 disabled:opacity-50 transition-colors"
                   >
-                    {saving ? 'Saving...' : 'Save Changes'}
-                  </motion.button>
-
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
+                    {saving ? 'Saving...' : 'Save changes'}
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setEditing(false)}
-                    className="flex-1 text-factory-muted hover:text-white text-sm px-3 py-2 rounded border border-factory-border transition-colors"
+                    className="px-3 py-2.5 rounded-lg border border-white/10 text-sm text-slate-300 hover:text-white hover:border-white/20 transition-colors"
                   >
                     Cancel
-                  </motion.button>
+                  </button>
                 </div>
               </form>
             ) : (
-              <div className="space-y-6">
-                {/* User ID */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-factory-muted">User ID</p>
-                  <p className="text-white text-monospace bg-factory-dark rounded-xl px-4 py-2">
-                    {userProfile?.uid}
-                  </p>
+              <div className="space-y-3 pt-1">
+                <div>
+                  <p className="text-xs text-slate-500">User ID</p>
+                  <p className="text-sm text-slate-200 mt-0.5">{userProfile?.uid}</p>
                 </div>
-
-                {/* Member Since */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-factory-muted">Member Since</p>
-                  <p className="text-white">
+                <div>
+                  <p className="text-xs text-slate-500">Member since</p>
+                  <p className="text-sm text-slate-200 mt-0.5">
                     {userProfile?.createdAt ? new Date(userProfile.createdAt).toLocaleDateString() : 'Unknown'}
                   </p>
                 </div>
-
-                {/* Last Active */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-factory-muted">Last Active</p>
-                  <p className="text-white">Today</p>
+                <div>
+                  <p className="text-xs text-slate-500">Last active</p>
+                  <p className="text-sm text-slate-200 mt-0.5">Today</p>
                 </div>
               </div>
             )}
           </div>
-        </motion.div>
+        </div>
 
-        {/* Sign Out Button */}
-        <motion.button
-          whileTap={{ scale: 0.95 }}
+        <button
           onClick={() => void signOut()}
-          className="w-full mt-6 bg-factory-accent/20 text-factory-accent border border-factory-accent/30 text-sm px-4 py-3 rounded-xl font-medium hover:bg-factory-accent/30 transition-colors"
+          className="w-full rounded-lg border border-white/10 bg-white/5 text-sm text-slate-300 py-2.5 hover:border-white/20 hover:text-white transition-colors"
         >
-          Sign Out
-        </motion.button>
+          Sign out
+        </button>
       </main>
-    </motion.div>
+    </div>
   )
 }

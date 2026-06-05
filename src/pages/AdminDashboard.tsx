@@ -1,504 +1,315 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../hooks/useAuth";
-import { getReports, updateReportStatus } from "../lib/supabaseDb";
-import type { Report, ReportStatus } from "../types";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useNavigate } from "react-router-dom"
+import { useAuth } from "../hooks/useAuth"
+import { getReports, updateReportStatus } from "../lib/supabaseDb"
+import type { Report, ReportStatus } from "../types"
+import { motion, AnimatePresence } from "framer-motion"
 
-const STATUS_LABELS: Record<ReportStatus, string> = {
-  pending: "Pending",
-  in_progress: "In Progress",
-  resolved: "Resolved",
-};
+function getStatusColor(status: Report["status"]) {
+  switch (status) {
+    case "pending":
+      return "bg-amber-900/50 text-amber-300 border-amber-800"
+    case "in_progress":
+      return "bg-teal-900/50 text-teal-300 border-teal-800"
+    case "resolved":
+      return "bg-emerald-900/50 text-emerald-300 border-emerald-800"
+    default:
+      return "bg-white/10 text-white/70 border-white/20"
+  }
+}
 
-const STATUS_COLORS: Record<ReportStatus, string> = {
-  pending: "bg-yellow-900/50 text-yellow-300 border-yellow-800",
-  in_progress: "bg-blue-900/50 text-blue-300 border-blue-800",
-  resolved: "bg-green-900/50 text-green-300 border-green-800",
-};
+function getStatusLabel(status: Report["status"]) {
+  switch (status) {
+    case "pending":
+      return "Pending"
+    case "in_progress":
+      return "In Progress"
+    case "resolved":
+      return "Resolved"
+    default:
+      return status
+  }
+}
 
-function timeAgo(ts: number): string {
-  const diff = Date.now() - ts;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+function timeAgo(ts: number) {
+  const diff = Date.now() - ts
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return "just now"
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
 }
 
 export default function AdminDashboard() {
-  const { appUser, signOut } = useAuth();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [statusFilter, setStatusFilter] = useState<ReportStatus | undefined>(
-    undefined,
-  );
-  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
-  const [statusError, setStatusError] = useState<string | null>(null);
+  const { appUser, signOut } = useAuth()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [filter, setFilter] = useState<ReportStatus | "all">("all")
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null)
 
-  const {
-    data: reports = [],
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ["reports", statusFilter],
-    queryFn: () => getReports(statusFilter),
-    refetchInterval: 30_000, // Auto-refresh every 30s
-  });
+  const { data: reports = [], isLoading } = useQuery({
+    queryKey: ["reports", filter],
+    queryFn: () => (filter === "all" ? getReports(undefined) : getReports(filter)),
+  })
 
-  const updateStatus = useMutation({
-    mutationFn: ({
-      reportId,
-      status,
-    }: {
-      reportId: string;
-      status: ReportStatus;
-    }) => updateReportStatus(reportId, status),
-    onSuccess: (_, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ["reports"] });
-      setStatusError(null);
-      // Update selectedReport locally so the modal stays open and reflects new status
+  const mutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: ReportStatus }) =>
+      updateReportStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reports"] })
       setSelectedReport((prev) => {
-        if (prev && prev.reportId === variables.reportId) {
-          return { ...prev, status: variables.status };
-        }
-        return prev;
-      });
+        if (!prev) return prev
+        return { ...prev, status: prev.status }
+      })
     },
-    onError: (err: Error) => {
-      console.error("Failed to update status:", err);
-      setStatusError(err.message || "Gagal memperbarui status. Periksa koneksi atau izin database.");
-    },
-  });
+  })
 
-  const filters: Array<{ label: string; value: ReportStatus | undefined }> = [
-    { label: "All", value: undefined },
-    { label: "Pending", value: "pending" },
-    { label: "In Progress", value: "in_progress" },
-    { label: "Resolved", value: "resolved" },
-  ];
-
-  // Get first issue photo from checklist
-  function getFirstIssuePhoto(checklistData: any): string | null {
-    if (!checklistData?.items) return null;
-    for (const itemId in checklistData.items) {
-      for (const check of checklistData.items[itemId].checks) {
-        if (check.issuePhotoUrl) return check.issuePhotoUrl;
-      }
-    }
-    return null;
-  }
-
-  // Get issue count
-  function getIssueCount(checklistData: any): number {
-    if (!checklistData?.items) return 0;
-    let count = 0;
-    for (const itemId in checklistData.items) {
-      for (const check of checklistData.items[itemId].checks) {
-        const options = check.options || [];
-        const selectedOption = check.selectedOption;
-        if (selectedOption) {
-          const index = options.indexOf(selectedOption);
-          const isIssue =
-            options.length === 2
-              ? index === 1
-              : options.length === 3
-                ? index >= 1
-                : index === options.length - 1;
-          if (isIssue) count++;
-        }
-      }
-    }
-    return count;
-  }
+  const filtered =
+    filter === "all" ? reports : reports.filter((r) => r.status === filter)
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="min-h-screen bg-factory-dark"
-    >
-      {/* Header */}
-      <header className="bg-factory-card border-b border-factory-border px-4 py-4">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
+    <div className="min-h-screen bg-[#0f172a] text-slate-100">
+      <header className="border-b border-white/10 bg-[#0f172a]/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-white font-bold text-xl">Dashboard</h1>
-            <p className="text-factory-muted text-xs mt-0.5">
-              Welcome, {appUser?.displayName}
-            </p>
+            <h1 className="text-lg font-semibold tracking-tight">Dashboard</h1>
+            <p className="text-sm text-slate-400 mt-0.5">Welcome, {appUser?.displayName}</p>
           </div>
           <div className="flex items-center gap-2">
-            <motion.button
-              whileTap={{ scale: 0.95 }}
+            <button
               onClick={() => navigate("/qr-generator")}
-              className="bg-factory-accent/20 text-factory-accent border border-factory-accent/30 text-sm px-3 py-2 rounded-lg min-h-[44px] font-medium"
+              className="px-3 py-2 text-sm font-medium rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
             >
               QR Codes
-            </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
+            </button>
+            <button
               onClick={() => void signOut()}
-              className="text-factory-muted text-sm px-3 py-2 min-h-[44px]"
+              className="px-3 py-2 text-sm text-slate-400 hover:text-white transition-colors"
             >
               Sign out
-            </motion.button>
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto p-4 space-y-4">
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
+      <main className="max-w-3xl mx-auto px-4 py-5 space-y-5">
+        <section className="grid grid-cols-3 gap-3">
           {[
-            { label: "Total", count: reports.length, color: "text-white" },
-            {
-              label: "Pending",
-              count: reports.filter((r) => r.status === "pending").length,
-              color: "text-yellow-400",
-            },
-            {
-              label: "Resolved",
-              count: reports.filter((r) => r.status === "resolved").length,
-              color: "text-green-400",
-            },
+            { label: "Total", value: reports.length },
+            { label: "Pending", value: reports.filter((r) => r.status === "pending").length },
+            { label: "Resolved", value: reports.filter((r) => r.status === "resolved").length },
           ].map((stat) => (
-            <div
-              key={stat.label}
-              className="bg-factory-card border border-factory-border rounded-xl p-4 text-center"
-            >
-              <p className={`text-2xl font-bold ${stat.color}`}>{stat.count}</p>
-              <p className="text-factory-muted text-xs mt-0.5">{stat.label}</p>
+            <div key={stat.label} className="rounded-xl border border-white/10 bg-white/5 p-4 text-center">
+              <p className="text-2xl font-semibold tracking-tight">{stat.value}</p>
+              <p className="text-sm text-slate-400 mt-1">{stat.label}</p>
             </div>
           ))}
-        </div>
+        </section>
 
-        {/* Filters */}
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {filters.map((f) => (
+        <section className="flex gap-2">
+          {(["all", "pending", "in_progress", "resolved"] as const).map((f) => (
             <button
-              key={f.label}
-              onClick={() => setStatusFilter(f.value)}
-              className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors min-h-[36px] ${
-                statusFilter === f.value
-                  ? "bg-factory-accent text-white"
-                  : "bg-factory-card border border-factory-border text-factory-muted hover:text-white"
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
+                filter === f
+                  ? "bg-[#0d9488] text-white border-[#0d9488]"
+                  : "border-white/10 text-slate-300 hover:border-white/20"
               }`}
             >
-              {f.label}
+              {f === "all" ? "All" : getStatusLabel(f)}
             </button>
           ))}
-        </div>
+        </section>
 
-        {/* Reports list */}
         {isLoading ? (
-          <div className="flex justify-center py-12">
-            <div className="w-8 h-8 rounded-full border-2 border-factory-accent/30 border-t-factory-accent animate-spin" />
+          <div className="flex justify-center py-16">
+            <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-[#0d9488] animate-spin" />
           </div>
-        ) : error ? (
-          <div className="bg-red-950/50 border border-red-800 text-red-300 rounded-xl p-4 text-sm">
-            Failed to load reports. Check your internet connection.
-          </div>
-        ) : reports.length === 0 ? (
-          <div className="text-center py-12 text-factory-muted">
-            <p className="text-4xl mb-3">📋</p>
-            <p>No reports found</p>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-16 text-slate-400">
+            <div className="w-10 h-10 rounded-full bg-white/5 mx-auto mb-3" />
+            <p className="text-sm">No reports found</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {reports.map((report) => {
-              const issuePhoto = getFirstIssuePhoto(report.checklistData);
-              const issueCount = getIssueCount(report.checklistData);
+          <section className="space-y-3">
+            {filtered.map((report) => {
+              const issuePhoto =
+                report.checklistData?.items &&
+                Object.values(report.checklistData.items).some((item: any) =>
+                  item.checks.some((c: any) => c.issuePhotoUrl),
+                )
+                  ? Object.values(report.checklistData.items)
+                      .flatMap((item: any) => item.checks)
+                      .find((c: any) => c.issuePhotoUrl)?.issuePhotoUrl
+                  : null
+
+              const issueCount =
+                report.checklistData?.items
+                  ? Object.values(report.checklistData.items).reduce((count: number, item: any) => {
+                      return (
+                        count +
+                        item.checks.filter((c: any) => {
+                          const options = c.options || []
+                          const idx = options.indexOf(c.selectedOption)
+                          if (idx === -1) return false
+                          if (options.length === 2) return idx === 1
+                          if (options.length === 3) return idx >= 1
+                          return idx === options.length - 1
+                        }).length
+                      )
+                    }, 0)
+                  : 0
+
               return (
-                <motion.div
+                <motion.button
                   key={report.reportId}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  whileTap={{ scale: 0.98 }}
                   onClick={() => setSelectedReport(report)}
-                  className="bg-factory-card border border-factory-border rounded-2xl p-4 cursor-pointer hover:border-factory-accent/50 transition-colors"
+                  className="w-full text-left rounded-xl border border-white/10 bg-white/5 p-4 hover:border-[#0d9488]/50 transition-colors"
                 >
                   <div className="flex gap-3">
                     {issuePhoto && (
                       <img
                         src={issuePhoto}
-                        alt="Issue"
-                        className="w-16 h-16 rounded-xl object-cover flex-shrink-0 bg-factory-border"
+                        alt="issue"
+                        className="w-14 h-14 rounded-lg object-cover bg-white/5"
                       />
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-white font-medium text-sm truncate">
-                          {report.areaName || report.areaId}
-                        </p>
-                        <span
-                          className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[report.status]}`}
-                        >
-                          {STATUS_LABELS[report.status]}
+                        <p className="text-sm font-medium truncate">{report.areaName || report.areaId}</p>
+                        <span className={`text-xs px-2 py-0.5 rounded-full border ${getStatusColor(report.status)}`}>
+                          {getStatusLabel(report.status)}
                         </span>
                       </div>
-                      <p className="text-factory-muted text-sm mt-1">
-                        {issueCount > 0
-                          ? `${issueCount} issue(s) found`
-                          : "No issues"}
+                      <p className="text-sm text-slate-400 mt-1">
+                        {issueCount > 0 ? `${issueCount} issue(s) found` : "No issues"}
                       </p>
-                      <p className="text-factory-muted/60 text-xs mt-1.5">
-                        {timeAgo(report.timestamp)}
-                      </p>
+                      <p className="text-xs text-slate-500 mt-1">{timeAgo(report.timestamp)}</p>
                     </div>
                   </div>
-                </motion.div>
-              );
+                </motion.button>
+              )
             })}
-          </div>
+          </section>
         )}
       </main>
 
-      {/* Report detail modal */}
       <AnimatePresence>
         {selectedReport && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-4"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4"
             onClick={() => setSelectedReport(null)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-factory-card border border-factory-border rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto"
+              className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0f172a] max-h-[85vh] overflow-y-auto"
             >
-              <div className="p-4 border-b border-factory-border flex items-center justify-between">
-                <h2 className="text-white font-semibold">Report Details</h2>
-                <motion.button
-                  whileTap={{ scale: 0.9 }}
+              <div className="flex items-center justify-between p-4 border-b border-white/10">
+                <h2 className="text-sm font-semibold">Report details</h2>
+                <button
                   onClick={() => setSelectedReport(null)}
-                  className="text-factory-muted w-8 h-8 flex items-center justify-center"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 text-slate-400"
                 >
                   ✕
-                </motion.button>
+                </button>
               </div>
 
               <div className="p-4 space-y-4">
-                <div className="space-y-2 text-sm">
-                  {[
-                    {
-                      label: "Area",
-                      value: selectedReport.areaName || selectedReport.areaId,
-                    },
-                    {
-                      label: "Time",
-                      value: new Date(
-                        selectedReport.timestamp,
-                      ).toLocaleString(),
-                    },
-                    ...(selectedReport.gpsLat !== undefined &&
-                    selectedReport.gpsLng !== undefined
-                      ? [
-                          {
-                            label: "GPS",
-                            value: `${selectedReport.gpsLat.toFixed(5)}, ${selectedReport.gpsLng.toFixed(5)}`,
-                          },
-                        ]
-                      : []),
-                  ].map((item) => (
-                    <motion.div
-                      key={item.label}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.1 }}
-                      className="flex justify-between"
-                    >
-                      <span className="text-factory-muted">{item.label}</span>
-                      <span className="text-white">{item.value}</span>
-                    </motion.div>
-                  ))}
-                  <motion.div
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="flex justify-between"
-                  >
-                    <span className="text-factory-muted">Status</span>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[selectedReport.status]}`}
-                    >
-                      {STATUS_LABELS[selectedReport.status]}
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-slate-400 text-xs">Area</p>
+                    <p className="mt-0.5 font-medium">{selectedReport.areaName || selectedReport.areaId}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-xs">Status</p>
+                    <span className={`mt-0.5 inline-block text-xs px-2 py-0.5 rounded-full border ${getStatusColor(selectedReport.status)}`}>
+                      {getStatusLabel(selectedReport.status)}
                     </span>
-                  </motion.div>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-slate-400 text-xs">Time</p>
+                    <p className="mt-0.5">{new Date(selectedReport.timestamp).toLocaleString()}</p>
+                  </div>
+                  {selectedReport.gpsLat !== undefined && selectedReport.gpsLng !== undefined && (
+                    <div className="col-span-2">
+                      <p className="text-slate-400 text-xs">GPS</p>
+                      <p className="mt-0.5">{selectedReport.gpsLat.toFixed(5)}, {selectedReport.gpsLng.toFixed(5)}</p>
+                    </div>
+                  )}
                 </div>
 
-                {/* Checklist details */}
-                {selectedReport.checklistData && (
-                  <div>
-                    <p className="text-factory-muted text-sm mb-2">
-                      Checklist Items
-                    </p>
-                    <div className="space-y-2">
-                      {Object.values(selectedReport.checklistData.items).map(
-                        (item) => (
-                          <div
-                            key={item.id}
-                            className="p-2 bg-factory-dark/50 rounded-lg"
-                          >
-                            <p className="text-factory-accent text-xs font-medium">
-                              {item.name}
-                            </p>
-                            {item.checks.map((check) => {
-                              // Determine option status for background color
-                              const options = check.options || [];
-                              const selectedOption = check.selectedOption;
-                              const index = selectedOption
-                                ? options.indexOf(selectedOption)
-                                : -1;
-                              let statusBg = "";
-                              let badgeClass = "bg-factory-border/50 text-factory-muted";
-                              if (selectedOption && index !== -1) {
-                                if (options.length === 2) {
-                                  statusBg =
-                                    index === 0
-                                      ? "bg-green-900/40"
-                                      : "bg-red-900/40";
-                                  badgeClass =
-                                    index === 0
-                                      ? "bg-green-900/50 text-green-300"
-                                      : "bg-red-900/50 text-red-300";
-                                } else if (options.length === 3) {
-                                  statusBg =
-                                    index === 0
-                                      ? "bg-green-900/40"
-                                      : index === 1
-                                        ? "bg-yellow-900/40"
-                                        : "bg-red-900/40";
-                                  badgeClass =
-                                    index === 0
-                                      ? "bg-green-900/50 text-green-300"
-                                      : index === 1
-                                        ? "bg-yellow-900/50 text-yellow-300"
-                                        : "bg-red-900/50 text-red-300";
-                                } else {
-                                  statusBg =
-                                    index === options.length - 1
-                                      ? "bg-red-900/40"
-                                      : "bg-green-900/40";
-                                  badgeClass =
-                                    index === options.length - 1
-                                      ? "bg-red-900/50 text-red-300"
-                                      : "bg-green-900/50 text-green-300";
-                                }
-                              }
-                              const hasAfter = check.afterPhotoUrl;
-                              const hasAfterDesc = check.afterDescription;
-                              return (
-                                <div
-                                  key={check.id}
-                                  className={`p-2 rounded-lg ${statusBg}`}
-                                >
-                                  <div className="flex items-center justify-between text-xs">
-                                    <span className="text-white truncate">
-                                      {check.label}
-                                    </span>
-                                    <span className={`text-xs px-2 py-0.5 rounded ${badgeClass}`}>
-                                      {selectedOption || "-"}
-                                    </span>
-                                  </div>
-                                  {/* Before photo */}
-                                  {check.issuePhotoUrl && (
-                                    <div className="mt-1">
-                                      <span className="text-red-400 text-[10px] block">
-                                        Before:
-                                      </span>
-                                      <img
-                                        src={check.issuePhotoUrl}
-                                        alt="Before"
-                                        className="w-full max-h-20 object-cover rounded border border-factory-border"
-                                      />
-                                    </div>
-                                  )}
-                                  {/* After photo */}
-                                  {hasAfter && (
-                                    <div className="mt-1">
-                                      <span className="text-green-400 text-[10px] block">
-                                        After:
-                                      </span>
-                                      <img
-                                        src={check.afterPhotoUrl}
-                                        alt="After"
-                                        className="w-full max-h-20 object-cover rounded border border-factory-border"
-                                      />
-                                    </div>
-                                  )}
-                                  {/* Action description */}
-                                  {hasAfterDesc && (
-                                    <p className="text-factory-muted text-[10px] mt-1 italic">
-                                      Action: {check.afterDescription}
-                                    </p>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ),
-                      )}
-                    </div>
+                {selectedReport.checklistData?.items && (
+                  <div className="space-y-3">
+                    <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Checklist</p>
+                    {Object.values(selectedReport.checklistData.items).map((item: any) => (
+                      <div key={item.id} className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-2">
+                        <p className="text-sm font-medium text-[#0d9488]">{item.name}</p>
+                        {item.checks.map((check: any) => {
+                          const options = check.options || []
+                          const selectedOption = check.selectedOption
+                          const index = selectedOption ? options.indexOf(selectedOption) : -1
+
+                          const getBadge = () => {
+                            if (!selectedOption || index === -1) return "bg-white/10 text-slate-400"
+                            if (options.length === 2) {
+                              return index === 0 ? "bg-emerald-900/40 text-emerald-300" : "bg-red-900/40 text-red-300"
+                            }
+                            if (options.length === 3) {
+                              if (index === 0) return "bg-emerald-900/40 text-emerald-300"
+                              if (index === 1) return "bg-amber-900/40 text-amber-300"
+                              return "bg-red-900/40 text-red-300"
+                            }
+                            return index === options.length - 1 ? "bg-red-900/40 text-red-300" : "bg-emerald-900/40 text-emerald-300"
+                          }
+
+                          return (
+                            <div key={check.id} className="flex items-start justify-between gap-2 text-sm">
+                              <span className="text-slate-200">{check.label}</span>
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${getBadge()}`}>
+                                {selectedOption || "-"}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ))}
                   </div>
                 )}
 
-                {/* Status update actions */}
-                <div className="flex flex-col gap-2">
-                  {statusError && (
-                    <div className="bg-red-950/60 border border-red-800 text-red-300 text-xs rounded-lg px-3 py-2">
-                      {statusError}
-                      <button
-                        onClick={() => setStatusError(null)}
-                        className="float-right text-red-400 hover:text-red-200 font-bold"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-                  <div className="flex gap-2">
+                <div className="flex gap-2 pt-2">
                   {selectedReport.status !== "in_progress" && (
-                    <motion.button
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() =>
-                        updateStatus.mutate({
-                          reportId: selectedReport.reportId,
-                          status: "in_progress",
-                        })
-                      }
-                      disabled={updateStatus.isPending}
-                      className="flex-1 bg-blue-900/50 border border-blue-700 text-blue-300 py-2.5 rounded-xl text-sm font-medium min-h-[44px] disabled:opacity-50"
+                    <button
+                      onClick={() => mutation.mutate({ id: selectedReport.reportId, status: "in_progress" })}
+                      disabled={mutation.isPending}
+                      className="flex-1 px-3 py-2.5 text-sm font-medium rounded-xl bg-teal-900/40 text-teal-200 border border-teal-700/50 hover:bg-teal-900/60 disabled:opacity-50 transition-colors"
                     >
                       Mark In Progress
-                    </motion.button>
+                    </button>
                   )}
                   {selectedReport.status !== "resolved" && (
-                    <motion.button
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() =>
-                        updateStatus.mutate({
-                          reportId: selectedReport.reportId,
-                          status: "resolved",
-                        })
-                      }
-                      disabled={updateStatus.isPending}
-                      className="flex-1 bg-green-900/50 border border-green-700 text-green-300 py-2.5 rounded-xl text-sm font-medium min-h-[44px] disabled:opacity-50"
+                    <button
+                      onClick={() => mutation.mutate({ id: selectedReport.reportId, status: "resolved" })}
+                      disabled={mutation.isPending}
+                      className="flex-1 px-3 py-2.5 text-sm font-medium rounded-xl bg-emerald-900/40 text-emerald-200 border border-emerald-700/50 hover:bg-emerald-900/60 disabled:opacity-50 transition-colors"
                     >
                       Mark Resolved
-                    </motion.button>
+                    </button>
                   )}
-                  </div>
                 </div>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
-  );
+    </div>
+  )
 }

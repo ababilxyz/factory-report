@@ -32,7 +32,7 @@ export default function ScannerPage() {
       className="min-h-screen bg-black flex flex-col"
     >
       {/* Top bar */}
-      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 pt-safe-top py-4 bg-gradient-to-b from-black/80 to-transparent">
+      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 pt-safe-top py-4 bg-black/80">
         <button
           onClick={() => navigate(-1)}
           className="w-11 h-11 rounded-full bg-black/50 flex items-center justify-center text-white"
@@ -41,7 +41,12 @@ export default function ScannerPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <h1 className="text-white font-semibold">Scan Area QR</h1>
+        <div className='flex items-center gap-2'>
+          <svg className='w-6 h-6 text-[#0d9488]' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={1.5}>
+            <path strokeLinecap='round' strokeLinejoin='round' d='M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21' />
+          </svg>
+          <h1 className="text-white font-semibold text-sm">Scan Area QR</h1>
+        </div>
         <div className="w-11" /> {/* Spacer */}
       </div>
 

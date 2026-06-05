@@ -37,37 +37,37 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-factory-dark flex items-center justify-center p-4">
+    <div className="min-h-screen bg-factory-dark flex items-center justify-center p-6">
       <div className="w-full max-w-sm">
         {/* Logo / Brand */}
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
           className="text-center mb-10"
         >
           <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-factory-accent mb-4"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.15, duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
+            className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-factory-accent mb-4"
           >
-            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
             </svg>
           </motion.div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">FactoryReport</h1>
-          <p className="text-factory-muted text-sm mt-1">Issue Reporting System</p>
+          <h1 className="text-xl font-semibold text-white tracking-tight">FactoryReport</h1>
+          <p className="text-factory-muted text-sm mt-1 leading-snug">Issue Reporting System</p>
         </motion.div>
 
         {/* Form Card */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
+          transition={{ delay: 0.2, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
           className="bg-factory-card border border-factory-border rounded-2xl p-6"
         >
-          <h2 className="text-white font-semibold text-lg mb-6">Sign in to continue</h2>
+          <h2 className="text-white font-semibold text-base mb-5">Sign in to continue</h2>
 
           {error && (
             <motion.div

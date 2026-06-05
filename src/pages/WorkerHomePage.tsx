@@ -13,17 +13,26 @@ export default function WorkerHomePage() {
       className='min-h-screen bg-factory-dark flex flex-col'
     >
       {/* Header */}
-      <header className='bg-factory-card border-b border-factory-border px-4 py-4 flex items-center justify-between'>
-        <div>
-          <h1 className='text-white font-semibold'>Form Laporan Line AA</h1>
-          <p className='text-factory-muted text-xs mt-0.5'>{appUser?.displayName}</p>
+      <header className='bg-factory-card border-b border-factory-border px-5 py-4'>
+        <div className='flex items-center justify-between'>
+          <div className='flex items-center gap-3'>
+            <div className='w-8 h-8 rounded-lg bg-factory-accent flex items-center justify-center text-white'>
+              <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2.5}>
+                <path strokeLinecap='round' strokeLinejoin='round' d='M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21' />
+              </svg>
+            </div>
+            <div>
+              <h1 className='text-white font-semibold text-base leading-tight'>Form Laporan Line AA</h1>
+              <p className='text-factory-muted text-sm mt-0.5'>{appUser?.displayName}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => void signOut()}
+            className='text-factory-muted hover:text-white text-sm transition-colors min-h-[44px] min-w-[44px] flex items-center justify-end'
+          >
+            Sign out
+          </button>
         </div>
-        <button
-          onClick={() => void signOut()}
-          className='text-factory-muted hover:text-white text-sm transition-colors min-h-[44px] min-w-[44px] flex items-center justify-end'
-        >
-          Sign out
-        </button>
       </header>
 
       {/* Main content */}
@@ -31,21 +40,15 @@ export default function WorkerHomePage() {
         {/* Big Scan Button */}
         <motion.button
           onClick={() => navigate('/scan')}
-          whileTap={{ scale: 0.95 }}
-          whileHover={{ scale: 1.02 }}
-          className='w-full max-w-sm bg-factory-accent hover:bg-factory-accent-light text-white rounded-3xl p-8 flex flex-col items-center gap-4 transition-all shadow-lg shadow-indigo-900/30'
+          whileTap={{ scale: 0.97 }}
+          className='w-full max-w-sm bg-factory-accent hover:bg-factory-accent-light text-white rounded-2xl p-8 flex flex-col items-center gap-4 transition-colors'
         >
-          <motion.div
-            initial={{ scale: 1 }}
-            animate={{ scale: [1, 1.05, 1] }}
-            transition={{ repeat: Infinity, duration: 2, repeatDelay: 1 }}
-            className='w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center'
-          >
+          <div className='w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center'>
             <svg className='w-10 h-10 text-white' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={1.5}>
               <path strokeLinecap='round' strokeLinejoin='round' d='M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z' />
               <path strokeLinecap='round' strokeLinejoin='round' d='M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z' />
             </svg>
-          </motion.div>
+          </div>
           <div className='text-center'>
             <p className='text-xl font-bold'>Scan QR Code</p>
             <p className='text-white/70 text-sm mt-1'>Scan QR Code Untuk Melaporkan</p>
