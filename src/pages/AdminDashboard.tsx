@@ -281,19 +281,6 @@ export default function AdminDashboard() {
               </div>
 
               <div className="p-4 space-y-4">
-                <AnimatePresence>
-                  {getFirstIssuePhoto(selectedReport.checklistData) && (
-                    <motion.img
-                      key="photo"
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      src={getFirstIssuePhoto(selectedReport.checklistData)!}
-                      alt="Issue"
-                      className="w-full rounded-xl object-cover max-h-48"
-                    />
-                  )}
-                </AnimatePresence>
-
                 <div className="space-y-2 text-sm">
                   {[
                     {
@@ -366,12 +353,17 @@ export default function AdminDashboard() {
                                 ? options.indexOf(selectedOption)
                                 : -1;
                               let statusBg = "";
+                              let badgeClass = "bg-factory-border/50 text-factory-muted";
                               if (selectedOption && index !== -1) {
                                 if (options.length === 2) {
                                   statusBg =
                                     index === 0
                                       ? "bg-green-900/40"
                                       : "bg-red-900/40";
+                                  badgeClass =
+                                    index === 0
+                                      ? "bg-green-900/50 text-green-300"
+                                      : "bg-red-900/50 text-red-300";
                                 } else if (options.length === 3) {
                                   statusBg =
                                     index === 0
@@ -379,11 +371,21 @@ export default function AdminDashboard() {
                                       : index === 1
                                         ? "bg-yellow-900/40"
                                         : "bg-red-900/40";
+                                  badgeClass =
+                                    index === 0
+                                      ? "bg-green-900/50 text-green-300"
+                                      : index === 1
+                                        ? "bg-yellow-900/50 text-yellow-300"
+                                        : "bg-red-900/50 text-red-300";
                                 } else {
                                   statusBg =
                                     index === options.length - 1
                                       ? "bg-red-900/40"
                                       : "bg-green-900/40";
+                                  badgeClass =
+                                    index === options.length - 1
+                                      ? "bg-red-900/50 text-red-300"
+                                      : "bg-green-900/50 text-green-300";
                                 }
                               }
                               const hasAfter = check.afterPhotoUrl;
@@ -397,7 +399,7 @@ export default function AdminDashboard() {
                                     <span className="text-white truncate">
                                       {check.label}
                                     </span>
-                                    <span className="text-factory-muted ml-2">
+                                    <span className={`text-xs px-2 py-0.5 rounded ${badgeClass}`}>
                                       {selectedOption || "-"}
                                     </span>
                                   </div>

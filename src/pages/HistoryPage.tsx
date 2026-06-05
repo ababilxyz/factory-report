@@ -26,6 +26,31 @@ function getCheckStatusBg(check: CheckItem): string {
   return index === options.length - 1 ? "bg-red-900/30" : "bg-green-900/30";
 }
 
+// Determine badge color class for the option label pill
+function getCheckBadgeColor(check: CheckItem): string {
+  const options = check.options || [];
+  const selectedOption = check.selectedOption;
+  if (!selectedOption) return "bg-factory-border/50 text-factory-muted";
+
+  const index = options.indexOf(selectedOption);
+  if (index === -1) return "bg-factory-border/50 text-factory-muted";
+
+  if (options.length === 2) {
+    return index === 0
+      ? "bg-green-900/50 text-green-300"
+      : "bg-red-900/50 text-red-300";
+  }
+  if (options.length === 3) {
+    if (index === 0) return "bg-green-900/50 text-green-300";
+    if (index === 1) return "bg-yellow-900/50 text-yellow-300";
+    return "bg-red-900/50 text-red-300";
+  }
+  // Default: last option = negative
+  return index === options.length - 1
+    ? "bg-red-900/50 text-red-300"
+    : "bg-green-900/50 text-green-300";
+}
+
 export default function HistoryPage() {
   const { appUser } = useAuth();
   const navigate = useNavigate();
@@ -214,11 +239,7 @@ export default function HistoryPage() {
                                     {check.label}
                                   </span>
                                   <span
-                                    className={`text-xs px-2 py-0.5 rounded ${
-                                      check.selectedOption
-                                        ? "bg-red-900/50 text-red-300"
-                                        : "bg-factory-border/50 text-factory-muted"
-                                    }`}
+                                    className={`text-xs px-2 py-0.5 rounded ${getCheckBadgeColor(check)}`}
                                   >
                                     {check.selectedOption || "Not selected"}
                                   </span>
