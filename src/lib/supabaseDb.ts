@@ -63,6 +63,7 @@ export async function getAllAreas(): Promise<Area[]> {
   const { data, error } = await supabase
     .from('areas')
     .select('*')
+    .order('name', { ascending: true })
 
   if (error) throw error
   return (data || []).map((d: any) => ({
@@ -158,6 +159,9 @@ export async function createReport(
   const item = await getItem(input.areaId)
   const area = item ? await getArea(item.areaId || '') : null
 
+  // Fetch worker profile to resolve display name for admin visibility
+  const workerProfile = await getUserProfile(workerUid)
+
   // Store areaId in report (itemId is passed as areaId for backward compatibility)
   // We need to fetch the parent area for the actual area reference
   let actualAreaId = input.areaId
@@ -170,6 +174,7 @@ export async function createReport(
     area_id: actualAreaId,
     area_name: area?.name,
     worker_uid: workerUid,
+    worker_name: workerProfile?.displayName || null,
     status: 'pending',
     gps_lat: input.gpsLat,
     gps_lng: input.gpsLng,

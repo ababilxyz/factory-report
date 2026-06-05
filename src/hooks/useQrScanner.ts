@@ -14,12 +14,13 @@ export function useQrScanner() {
   const [statusMessage, setStatusMessage] = useState('')
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const isProcessingRef = useRef(false)
+  const startingRef = useRef(false)
 
   const stopScanner = useCallback(async () => {
     if (scannerRef.current) {
       try {
         const state = scannerRef.current.getState()
-        if (state === 2) { // SCANNING
+        if (state === 2) {
           await scannerRef.current.stop()
         }
       } catch { /* ignore stop errors */ }
@@ -28,6 +29,9 @@ export function useQrScanner() {
   }, [])
 
   const startScanner = useCallback(async () => {
+    if (startingRef.current) return
+    startingRef.current = true
+
     setScanState('scanning')
     setError(null)
     setResult(null)
@@ -42,7 +46,6 @@ export function useQrScanner() {
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 280, height: 280 } },
         async (decodedText) => {
-          // Prevent multiple simultaneous scans
           if (isProcessingRef.current) return
           isProcessingRef.current = true
 
@@ -60,6 +63,8 @@ export function useQrScanner() {
         setError({ code: 'CAMERA_ERROR', message: 'Could not start camera. Ensure no other app is using it.' })
         setScanState('error')
       }
+    } finally {
+      startingRef.current = false
     }
   }, [stopScanner])
 

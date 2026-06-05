@@ -23,6 +23,16 @@ export interface Area {
   radiusMeters: number
 }
 
+export interface AreaWithItems {
+  areaId: string
+  name: string
+  encryptedQrPayload: string | null
+  allowedLat: number
+  allowedLng: number
+  radiusMeters: number
+  items: Item[]
+}
+
 // ==================
 // QR Payload (decrypted)
 // ==================

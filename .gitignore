@@ -65,5 +65,14 @@ node_modules/
 # dotenv environment variables file
 .env
 
+# Sensitive data — never commit
+database/users.csv
+deploy-log.txt
+
+# Build output
+dist/
+
 # dataconnect generated files
 .dataconnect
+
+.csv

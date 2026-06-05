@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { motion } from 'framer-motion'
+import { Factory, ScanQrCode, Home, User, Clock } from 'lucide-react'
 
 export default function WorkerHomePage() {
   const { appUser, signOut } = useAuth()
@@ -17,9 +18,7 @@ export default function WorkerHomePage() {
         <div className='flex items-center justify-between'>
           <div className='flex items-center gap-3'>
             <div className='w-8 h-8 rounded-lg bg-factory-accent flex items-center justify-center text-white'>
-              <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2.5}>
-                <path strokeLinecap='round' strokeLinejoin='round' d='M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21' />
-              </svg>
+              <Factory className='w-5 h-5' />
             </div>
             <div>
               <h1 className='text-white font-semibold text-base leading-tight'>Form Laporan Line AA</h1>
@@ -44,10 +43,7 @@ export default function WorkerHomePage() {
           className='w-full max-w-sm bg-factory-accent hover:bg-factory-accent-light text-white rounded-2xl p-8 flex flex-col items-center gap-4 transition-colors'
         >
           <div className='w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center'>
-            <svg className='w-10 h-10 text-white' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={1.5}>
-              <path strokeLinecap='round' strokeLinejoin='round' d='M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z' />
-              <path strokeLinecap='round' strokeLinejoin='round' d='M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z' />
-            </svg>
+            <ScanQrCode className='w-10 h-10 text-white' />
           </div>
           <div className='text-center'>
             <p className='text-xl font-bold'>Scan QR Code</p>
@@ -64,7 +60,7 @@ export default function WorkerHomePage() {
         >
           <h2 className='text-white font-bold mb-3'>Cara Melaporkan</h2>
           <ol className='space-y-2.5 text-sm text-factory-muted'>
-            {['Cari QR Code Yang Tertempel', 'Tekan "Scan QR Code" dan izinkan akses kamera', 'Arahkan kamera ke kode QR', 'Ambil foto jika ada masalah', 'Deskripsikan masalah dan kirim', 'Segera Ambil Tindakan', 'Berikan Foto Setelah Dilakukan Tindakan dan Deskripsikan Tindakan Apa Yang Dilakukan'].map((step, i) => (
+            {['Cari QR code yang tertempel', 'Tekan "Scan QR Code" dan izinkan akses kamera', 'Arahkan kamera ke kode QR', 'Ambil foto jika ada masalah dan dideskripsikan','Segera ambil tindakan', 'Ambil foto setelah dilakukan tindakan dan deskripsikan tindakan apa yang dilakukan', 'Kirim Laporan'].map((step, i) => (
               <motion.li
                 key={i}
                 initial={{ opacity: 0, x: -10 }}
@@ -89,9 +85,7 @@ export default function WorkerHomePage() {
           onClick={() => navigate('/home')}
           className='flex flex-col items-center gap-1 text-sm font-medium'
         >
-          <svg className='w-5 h-5' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
-            <path strokeLinecap='round' strokeLinejoin='round' d='M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 001 1h3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001-1m-5 8v-3' />
-          </svg>
+          <Home className='w-5 h-5' />
           <span>Home</span>
         </motion.button>
 
@@ -100,9 +94,7 @@ export default function WorkerHomePage() {
           onClick={() => navigate('/profile')}
           className='flex flex-col items-center gap-1 text-sm font-medium'
         >
-          <svg className='w-5 h-5' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
-            <path strokeLinecap='round' strokeLinejoin='round' d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' />
-          </svg>
+          <User className='w-5 h-5' />
           <span>Profile</span>
         </motion.button>
 
@@ -111,9 +103,7 @@ export default function WorkerHomePage() {
           onClick={() => navigate('/history')}
           className='flex flex-col items-center gap-1 text-sm font-medium'
         >
-          <svg className='w-5 h-5' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
-            <path strokeLinecap='round' strokeLinejoin='round' d='M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v10a2 2 0 002 2z' />
-          </svg>
+          <Clock className='w-5 h-5' />
           <span>History</span>
         </motion.button>
       </nav>

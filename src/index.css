@@ -42,7 +42,10 @@
   #qr-reader__header_message,
   #qr-reader__status_span,
   #qr-reader__camera_selection,
-  #qr-reader select {
+  #qr-reader select,
+  #qr-reader__scan_region,
+  #qr-shaded-region,
+  #qr-reader canvas {
     display: none !important;
   }
   #qr-reader {

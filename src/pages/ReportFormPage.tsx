@@ -863,7 +863,7 @@ export default function ReportFormPage() {
                               {/* Issue/Before Photo capture */}
                               <div>
                                 <span className="text-xs text-red-400 block mb-1">
-                                  Before Photo (Abnormality)
+                                  Foto Masalah (Before) <span className="text-red-400">*</span>
                                 </span>
                                 {check.issuePhotoPreview ? (
                                   <div className="relative rounded-lg overflow-hidden bg-factory-card border border-factory-border max-w-xs">
@@ -946,7 +946,7 @@ export default function ReportFormPage() {
                                         d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"
                                       />
                                     </svg>
-                                    Take Before Photo
+                                    Ambil Foto Masalah
                                   </motion.button>
                                 )}
                               </div>
@@ -954,7 +954,7 @@ export default function ReportFormPage() {
                               {/* Description */}
                               <div>
                                 <span className="text-xs text-yellow-400 block mb-1">
-                                  Abnormality Description
+                                  Deskripsikan Masalah
                                 </span>
                                 <textarea
                                   value={check.issueDescription || ""}
@@ -967,7 +967,7 @@ export default function ReportFormPage() {
                                   }
                                   rows={2}
                                   maxLength={300}
-                                  placeholder="Describe the abnormality..."
+                                  placeholder="Deskripsikan masalah..."
                                   className="w-full bg-factory-card border border-factory-border rounded-lg px-3 py-2 text-white placeholder-factory-muted focus:outline-none focus:border-yellow-500 transition-colors resize-none text-xs"
                                 />
                               </div>
@@ -975,7 +975,7 @@ export default function ReportFormPage() {
                               {/* After/Fix Photo capture - required for issues */}
                               <div>
                                 <span className="text-xs text-green-400 block mb-1">
-                                  After Photo (Fix/Completed) <span className="text-red-400">*</span>
+                                  Ambil Foto Setelah Tindakan <span className="text-red-400">*</span>
                                 </span>
                                 {check.afterPhotoPreview ? (
                                   <div className="relative rounded-lg overflow-hidden bg-factory-card border border-factory-border max-w-xs">
@@ -1062,7 +1062,7 @@ export default function ReportFormPage() {
                                         d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"
                                       />
                                     </svg>
-                                    Take After Photo
+                                    Ambil Foto Setelah Tindakan
                                   </motion.button>
                                 )}
                               </div>

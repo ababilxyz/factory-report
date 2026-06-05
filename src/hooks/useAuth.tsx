@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { checkRateLimit, clearRateLimitRecord, recordAttempt } from '../utils/rateLimiter'
+import { isValidEmail, sanitizeEmail, sanitizeString } from '../utils/sanitizer'
 import { supabase } from '../lib/supabase'
 import { getUserProfile } from '../lib/supabaseDb'
 import type { AppUser } from '../types'
@@ -67,13 +69,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   async function signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
+    const sanitizedEmail = sanitizeEmail(email);
+    const sanitizedPassword = sanitizeString(password, 128);
+
+    if (!isValidEmail(sanitizedEmail)) {
+      throw new Error('Please enter a valid email address.');
+    }
+
+    if (sanitizedPassword.length < 1) {
+      throw new Error('Please enter your password.');
+    }
+
+    const rateLimitKey = `factory_report_login:${sanitizedEmail}`;
+    const rateLimit = checkRateLimit(rateLimitKey);
+
+    if (!rateLimit.allowed) {
+      const minutes = Math.ceil(rateLimit.retryAfterMs / 60000);
+      throw new Error(`Too many failed login attempts. Please try again in ${minutes} minute(s).`);
+    }
+
+    recordAttempt(rateLimitKey);
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: sanitizedEmail,
+      password: sanitizedPassword,
+    });
+
+    if (error) {
+      const errorMessage = error.message?.toLowerCase() || '';
+      if (errorMessage.includes('invalid login credentials') || errorMessage.includes('invalid email or password')) {
+        throw new Error('Invalid email or password.');
+      }
+      if (errorMessage.includes('email not confirmed')) {
+        throw new Error('Please confirm your email before signing in.');
+      }
+      throw new Error(error.message || 'Failed to sign in. Please try again.');
+    }
+
+    clearRateLimitRecord(rateLimitKey);
 
     if (data.user) {
-      const profile = await getUserProfile(data.user.id)
-      if (!profile) throw new Error('User profile not found. Contact your administrator.')
-      setAppUser(profile)
+      const profile = await getUserProfile(data.user.id);
+      if (!profile) {
+        throw new Error('User profile not found. Contact your administrator.');
+      }
+      setAppUser(profile);
     }
   }
 

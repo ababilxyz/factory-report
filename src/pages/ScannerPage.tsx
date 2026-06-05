@@ -10,7 +10,7 @@ export default function ScannerPage() {
   useEffect(() => {
     void startScanner()
     return () => { void reset() }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [startScanner, reset])
 
   // Navigate to report form on success
   useEffect(() => {
@@ -42,9 +42,11 @@ export default function ScannerPage() {
           </svg>
         </button>
         <div className='flex items-center gap-2'>
-          <svg className='w-6 h-6 text-[#0d9488]' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={1.5}>
-            <path strokeLinecap='round' strokeLinejoin='round' d='M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21' />
-          </svg>
+          <div className='w-8 h-8 rounded-lg bg-[#0d9488] flex items-center justify-center text-white'>
+            <svg className='w-5 h-5' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
+              <path strokeLinecap='round' strokeLinejoin='round' d='M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21' />
+            </svg>
+          </div>
           <h1 className="text-white font-semibold text-sm">Scan Area QR</h1>
         </div>
         <div className="w-11" /> {/* Spacer */}
@@ -60,45 +62,13 @@ export default function ScannerPage() {
             animate={{ opacity: 1 }}
             className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
           >
-            {/* Corner markers */}
             <div className="relative w-72 h-72">
-              {/* Top-left */}
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.1 }}
-                className="absolute top-0 left-0 w-8 h-8 border-t-3 border-l-3 border-white rounded-tl-md" style={{ borderWidth: '3px 0 0 3px' }}
-              />
-              {/* Top-right */}
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.15 }}
-                className="absolute top-0 right-0 w-8 h-8 border-t-3 border-r-3 border-white rounded-tr-md" style={{ borderWidth: '3px 3px 0 0' }}
-              />
-              {/* Bottom-left */}
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2 }}
-                className="absolute bottom-0 left-0 w-8 h-8 border-b-3 border-l-3 border-white rounded-bl-md" style={{ borderWidth: '0 0 3px 3px' }}
-              />
-              {/* Bottom-right */}
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.25 }}
-                className="absolute bottom-0 right-0 w-8 h-8 border-b-3 border-r-3 border-white rounded-br-md" style={{ borderWidth: '0 3px 3px 0' }}
-              />
-              {/* Scanning line animation */}
-              {scanState === 'scanning' && (
-                <motion.div
-                  className="absolute inset-x-0 h-0.5 bg-factory-accent opacity-80"
-                  initial={{ top: 0 }}
-                  animate={{ top: 'calc(100% - 2px)' }}
-                  transition={{ duration: 2, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' }}
-                />
-              )}
+              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 288 288" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 40V8C0 3.58172 3.58172 0 8 0H40" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+                <path d="M248 0H280C284.418 0 288 3.58172 288 8V40" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+                <path d="M288 248V280C288 284.418 284.418 288 280 288H248" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+                <path d="M40 288H8C3.58172 288 0 284.418 0 280V248" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+              </svg>
             </div>
             <motion.p
               initial={{ opacity: 0, y: 10 }}
