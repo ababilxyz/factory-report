@@ -15,7 +15,7 @@ export default function WorkerHomePage() {
       {/* Header */}
       <header className='bg-factory-card border-b border-factory-border px-4 py-4 flex items-center justify-between'>
         <div>
-          <h1 className='text-white font-semibold'>FactoryReport</h1>
+          <h1 className='text-white font-semibold'>Form Laporan Line AA</h1>
           <p className='text-factory-muted text-xs mt-0.5'>{appUser?.displayName}</p>
         </div>
         <button
@@ -48,7 +48,7 @@ export default function WorkerHomePage() {
           </motion.div>
           <div className='text-center'>
             <p className='text-xl font-bold'>Scan QR Code</p>
-            <p className='text-white/70 text-sm mt-1'>Scan the area code to report an issue</p>
+            <p className='text-white/70 text-sm mt-1'>Scan QR Code Untuk Melaporkan</p>
           </div>
         </motion.button>
 
@@ -59,9 +59,9 @@ export default function WorkerHomePage() {
           transition={{ delay: 0.2 }}
           className='w-full max-w-sm bg-factory-card border border-factory-border rounded-2xl p-5'
         >
-          <h2 className='text-white font-bold mb-3'>How to report an issue</h2>
+          <h2 className='text-white font-bold mb-3'>Cara Melaporkan</h2>
           <ol className='space-y-2.5 text-sm text-factory-muted'>
-            {['Find the QR code posted in the problem area', 'Tap "Scan QR Code" and allow camera access', 'Point camera at the QR code', 'Take a photo of the issue', 'Describe the problem and submit'].map((step, i) => (
+            {['Cari QR Code Yang Tertempel', 'Tekan "Scan QR Code" dan izinkan akses kamera', 'Arahkan kamera ke kode QR', 'Ambil foto jika ada masalah', 'Deskripsikan masalah dan kirim', 'Segera Ambil Tindakan', 'Berikan Foto Setelah Dilakukan Tindakan dan Deskripsikan Tindakan Apa Yang Dilakukan'].map((step, i) => (
               <motion.li
                 key={i}
                 initial={{ opacity: 0, x: -10 }}
