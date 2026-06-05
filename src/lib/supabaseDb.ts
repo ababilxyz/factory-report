@@ -192,11 +192,10 @@ export async function createReport(
 
 // Update after photo for a specific check in an existing report
 export async function updateCheckAfterPhoto(
-   reportId: string,
-   checkId: string,
-   afterPhotoFile: File,
-   afterPhotoDescription?: string,
-   onProgress?: (percent: number) => void
+  reportId: string,
+  checkId: string,
+  afterPhotoFile: File,
+  onProgress?: (percent: number) => void
 ): Promise<void> {
   // Get existing report
   const { data: existingReport, error: fetchError } = await supabase
@@ -213,7 +212,7 @@ export async function updateCheckAfterPhoto(
   const compressed = await compressImage(afterPhotoFile)
   const result = await uploadImage(compressed, onProgress)
 
-// Update the checklist data with the after photo URL
+  // Update the checklist data with the after photo URL
   const checklistData = existingReport.checklist_data as ChecklistData
   if (!checklistData || !checklistData.items) {
     throw new Error('Invalid checklist data')
@@ -228,9 +227,6 @@ export async function updateCheckAfterPhoto(
       checklistData.items[itemId].checks[checkIndex].afterPhotoUrl = result.url
       checklistData.items[itemId].checks[checkIndex].afterPhotoFile = undefined
       checklistData.items[itemId].checks[checkIndex].afterPhotoPreview = undefined
-      if (afterPhotoDescription !== undefined) {
-        checklistData.items[itemId].checks[checkIndex].afterPhotoDescription = afterPhotoDescription
-      }
       break
     }
   }

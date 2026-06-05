@@ -14,8 +14,8 @@ export default function HistoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [updatingCheckId, setUpdatingCheckId] = useState<string | null>(null);
 
-  // Track pending after photo uploads and descriptions
-  const pendingAfterUploads = useRef<Map<string, { file: File; description: string }>>(new Map());
+  // Track pending after photo uploads
+  const pendingAfterUploads = useRef<Map<string, File>>(new Map());
 
   useEffect(() => {
     if (!appUser) {
@@ -96,18 +96,18 @@ export default function HistoryPage() {
 
   async function handleUpdateAfterPhoto(reportId: string, checkId: string) {
     try {
-      const data = pendingAfterUploads.current.get(checkId);
-      if (!data) return;
+      const file = pendingAfterUploads.current.get(checkId);
+      if (!file) return;
 
       setUpdatingCheckId(checkId);
 
-      await updateCheckAfterPhoto(reportId, checkId, data.file, data.description);
+      await updateCheckAfterPhoto(reportId, checkId, file);
 
       // Remove from pending
       pendingAfterUploads.current.delete(checkId);
 
       // Reload reports to get updated data
-      await loadReports();
+      loadReports();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to update after photo",
@@ -129,8 +129,8 @@ export default function HistoryPage() {
       // Create preview URL
       const url = URL.createObjectURL(file);
 
-      // Store in pending uploads (with empty description initially)
-      pendingAfterUploads.current.set(checkId, { file, description: "" });
+      // Store in pending uploads
+      pendingAfterUploads.current.set(checkId, file);
 
       // Update local state to show preview
       setReports((prev) =>
@@ -187,7 +187,6 @@ export default function HistoryPage() {
                       ...c,
                       afterPhotoPreview: undefined,
                       afterPhotoFile: undefined,
-                      afterPhotoDescription: undefined,
                     }
                   : c,
             );
@@ -312,7 +311,6 @@ export default function HistoryPage() {
                           {item.checks.map((check) => {
                             const needsPhoto = needsAfterPhoto(check);
                             const hasAfterPhoto = !!check.afterPhotoUrl;
-                            const currentReportId = report.reportId;
 
                             return (
                               <div
@@ -357,7 +355,7 @@ export default function HistoryPage() {
 
                                 {/* After photo or upload button */}
                                 {needsPhoto && (
-                                  <div className="mt-2 space-y-2">
+                                  <div className="mt-2">
                                     {hasAfterPhoto ? (
                                       <div>
                                         <span className="text-green-400 text-xs block mb-1">
@@ -368,11 +366,6 @@ export default function HistoryPage() {
                                           alt="After"
                                           className="w-full max-h-24 object-cover rounded border border-factory-border"
                                         />
-                                        {check.afterPhotoDescription && (
-                                          <p className="text-factory-muted text-xs mt-1 line-clamp-1">
-                                            {check.afterPhotoDescription}
-                                          </p>
-                                        )}
                                       </div>
                                     ) : check.afterPhotoPreview ? (
                                       <div>
@@ -426,40 +419,6 @@ export default function HistoryPage() {
                                             </svg>
                                           </button>
                                         </div>
-                                        <textarea
-                                          value={check.afterPhotoDescription || ""}
-                                          onChange={(e) => {
-                                            setReports((prev) =>
-                                              prev.map((r) => {
-                                                if (r.reportId === currentReportId && r.checklistData) {
-                                                  const updatedItems = { ...r.checklistData.items };
-                                                  if (updatedItems[item.id]) {
-                                                    updatedItems[item.id].checks = updatedItems[item.id].checks.map(
-                                                      (c) =>
-                                                        c.id === check.id
-                                                          ? { ...c, afterPhotoDescription: e.target.value }
-                                                          : c,
-                                                    );
-                                                  }
-                                                  return {
-                                                    ...r,
-                                                    checklistData: { ...r.checklistData, items: updatedItems },
-                                                  };
-                                                }
-                                                return r;
-                                              }),
-                                            );
-                                            // Also update pending uploads
-                                            const pending = pendingAfterUploads.current.get(check.id);
-                                            if (pending) {
-                                              pendingAfterUploads.current.set(check.id, { ...pending, description: e.target.value });
-                                            }
-                                          }}
-                                          rows={2}
-                                          maxLength={300}
-                                          placeholder="Tindakan yang dilakukan..."
-                                          className="w-full bg-factory-card border border-factory-border rounded-lg px-3 py-2 text-white placeholder-factory-muted focus:outline-none focus:border-green-500 transition-colors resize-none text-xs"
-                                        />
                                       </div>
                                     ) : (
                                       <motion.button
