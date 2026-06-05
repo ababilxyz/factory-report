@@ -195,6 +195,7 @@ export async function updateCheckAfterPhoto(
   reportId: string,
   checkId: string,
   afterPhotoFile: File,
+  afterAction?: string,
   onProgress?: (percent: number) => void
 ): Promise<void> {
   // Get existing report
@@ -227,6 +228,9 @@ export async function updateCheckAfterPhoto(
       checklistData.items[itemId].checks[checkIndex].afterPhotoUrl = result.url
       checklistData.items[itemId].checks[checkIndex].afterPhotoFile = undefined
       checklistData.items[itemId].checks[checkIndex].afterPhotoPreview = undefined
+      if (afterAction !== undefined) {
+        checklistData.items[itemId].checks[checkIndex].afterAction = afterAction
+      }
       break
     }
   }

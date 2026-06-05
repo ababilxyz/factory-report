@@ -16,6 +16,8 @@ export default function HistoryPage() {
 
   // Track pending after photo uploads
   const pendingAfterUploads = useRef<Map<string, File>>(new Map());
+  // Track pending after action text (checkId -> action text)
+  const pendingAfterActions = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
     if (!appUser) {
@@ -94,17 +96,18 @@ export default function HistoryPage() {
     return isIssue && !check.afterPhotoUrl;
   }
 
-  async function handleUpdateAfterPhoto(reportId: string, checkId: string) {
+  async function handleUpdateAfterPhoto(reportId: string, checkId: string, afterAction?: string) {
     try {
       const file = pendingAfterUploads.current.get(checkId);
       if (!file) return;
 
       setUpdatingCheckId(checkId);
 
-      await updateCheckAfterPhoto(reportId, checkId, file);
+      await updateCheckAfterPhoto(reportId, checkId, file, afterAction);
 
       // Remove from pending
       pendingAfterUploads.current.delete(checkId);
+      pendingAfterActions.current.delete(checkId);
 
       // Reload reports to get updated data
       loadReports();
@@ -131,6 +134,9 @@ export default function HistoryPage() {
 
       // Store in pending uploads
       pendingAfterUploads.current.set(checkId, file);
+      // Get existing action text if any
+      const existingAction = pendingAfterActions.current.get(checkId) || "";
+      pendingAfterActions.current.set(checkId, existingAction);
 
       // Update local state to show preview
       setReports((prev) =>
@@ -143,6 +149,8 @@ export default function HistoryPage() {
               );
               if (checkIndex !== -1) {
                 updatedItems[itemId].checks[checkIndex].afterPhotoPreview = url;
+                updatedItems[itemId].checks[checkIndex].afterAction =
+                  existingAction;
               }
             }
             return {
@@ -160,20 +168,55 @@ export default function HistoryPage() {
     }
   }
 
+  // Handle action text change for a pending after photo
+  function handleAfterActionChange(
+    reportId: string,
+    itemId: string,
+    checkId: string,
+    actionText: string,
+  ) {
+    // Store in pending actions map
+    pendingAfterActions.current.set(checkId, actionText);
+
+    // Update local state
+    setReports((prev) =>
+      prev.map((report) => {
+        if (report.reportId === reportId && report.checklistData) {
+          const updatedItems = { ...report.checklistData.items };
+          if (updatedItems[itemId]) {
+            const checkIndex = updatedItems[itemId].checks.findIndex(
+              (c) => c.id === checkId,
+            );
+            if (checkIndex !== -1) {
+              updatedItems[itemId].checks[checkIndex].afterAction =
+                actionText;
+            }
+          }
+          return {
+            ...report,
+            checklistData: { ...report.checklistData, items: updatedItems },
+          };
+        }
+        return report;
+      }),
+    );
+  }
+
   // Remove preview and pending upload
   function handleRemoveAfterPreview(
     reportId: string,
     itemId: string,
     checkId: string,
   ) {
-    const check = reports
-      .find((r) => r.reportId === reportId)
+    const report = reports.find((r) => r.reportId === reportId);
+    const check = report
       ?.checklistData?.items[itemId]?.checks.find((c) => c.id === checkId);
 
     if (check?.afterPhotoPreview) {
       URL.revokeObjectURL(check.afterPhotoPreview);
     }
     pendingAfterUploads.current.delete(checkId);
+    pendingAfterActions.current.delete(checkId);
 
     setReports((prev) =>
       prev.map((report) => {
@@ -187,6 +230,7 @@ export default function HistoryPage() {
                       ...c,
                       afterPhotoPreview: undefined,
                       afterPhotoFile: undefined,
+                      afterAction: undefined,
                     }
                   : c,
             );
@@ -373,23 +417,45 @@ export default function HistoryPage() {
                                           After (Pending):
                                         </span>
                                         <div className="relative">
-                                          <img
-                                            src={check.afterPhotoPreview}
-                                            alt="After"
-                                            className="w-full max-h-24 object-cover rounded border border-factory-border"
-                                          />
-                                          <button
-                                            onClick={() =>
-                                              handleUpdateAfterPhoto(
-                                                report.reportId,
+                                        <img
+                                          src={check.afterPhotoPreview}
+                                          alt="After"
+                                          className="w-full max-h-24 object-cover rounded border border-factory-border"
+                                        />
+                                        <textarea
+                                          value={
+                                            pendingAfterActions.current.get(
+                                              check.id,
+                                            ) || check.afterAction || ""
+                                          }
+                                          onChange={(e) =>
+                                            handleAfterActionChange(
+                                              report.reportId,
+                                              item.id,
+                                              check.id,
+                                              e.target.value,
+                                            )
+                                          }
+                                          placeholder="Tindakan yang dilakukan..."
+                                          rows={2}
+                                          maxLength={300}
+                                          className="w-full bg-factory-card border border-factory-border rounded-lg px-3 py-2 text-white placeholder-factory-muted focus:outline-none focus:border-yellow-500 transition-colors resize-none text-xs mt-1"
+                                        />
+                                        <button
+                                          onClick={() =>
+                                            handleUpdateAfterPhoto(
+                                              report.reportId,
+                                              check.id,
+                                              pendingAfterActions.current.get(
                                                 check.id,
-                                              )
-                                            }
-                                            disabled={
-                                              updatingCheckId === check.id
-                                            }
-                                            className="absolute bottom-1 right-1 bg-green-600 text-white text-xs px-3 py-1 rounded min-h-[36px]"
-                                          >
+                                              ) || check.afterAction,
+                                            )
+                                          }
+                                          disabled={
+                                            updatingCheckId === check.id
+                                          }
+                                          className="absolute bottom-1 right-1 bg-green-600 text-white text-xs px-3 py-1 rounded min-h-[36px]"
+                                        >
                                             {updatingCheckId === check.id
                                               ? "Updating..."
                                               : "Submit Fix"}
