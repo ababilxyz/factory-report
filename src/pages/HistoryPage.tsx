@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { getReportsByWorkerId, updateCheckAfterPhoto } from "../lib/supabaseDb";
-import { openCameraCapture, fileToDataUrl, dataUrlToFile } from "../utils/imageUtils";
+import { openCameraCapture, dataUrlToFile } from "../utils/imageUtils";
 import type { Report } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -31,10 +31,13 @@ export default function HistoryPage() {
     Map<string, { photoFile: File | null; description: string; previewUrl: string }>
   >(new Map());
 
-  // Restore preview state from sessionStorage when reports are loaded
+  // Track if we just made changes (to prevent restoration loop)
+  const isRestoringRef = useRef(false);
+
+  // Restore preview state from sessionStorage on mount (handles mobile page reloads)
   useEffect(() => {
-    // Only restore if we have reports loaded and haven't already restored
-    if (reports.length === 0) return;
+    // Only restore if we have reports loaded and not already restoring
+    if (reports.length === 0 || isRestoringRef.current) return;
     
     const saved = sessionStorage.getItem(AFTER_PHOTO_STORAGE_KEY);
     if (saved) {
@@ -53,6 +56,8 @@ export default function HistoryPage() {
               return;
             }
             
+            isRestoringRef.current = true;
+            
             // Convert dataUrl back to File for upload
             dataUrlToFile(parsed.dataUrl, `after-${parsed.checkId}.jpg`).then((file) => {
               const previewUrl = URL.createObjectURL(file);
@@ -64,6 +69,7 @@ export default function HistoryPage() {
               
               // Update state to show preview
               setReports((prev) => {
+                isRestoringRef.current = false;
                 return prev.map((r) => {
                   if (r.reportId === parsed.reportId && r.checklistData) {
                     const updatedItems = { ...r.checklistData.items };
@@ -87,7 +93,9 @@ export default function HistoryPage() {
                   return r;
                 });
               });
-            }).catch(console.error);
+            }).catch(() => {
+              isRestoringRef.current = false;
+            });
           }
         }
       } catch (e) {
@@ -95,24 +103,6 @@ export default function HistoryPage() {
       }
     }
   }, [reports]);
-
-  // Save preview state to sessionStorage when camera opens (before potential page reload)
-  async function savePreviewState(reportId: string, itemId: string, checkId: string, file: File, desc: string) {
-    try {
-      const dataUrl = await fileToDataUrl(file);
-      const state: PendingAfterPhotoState = {
-        reportId,
-        itemId,
-        checkId,
-        description: desc,
-        dataUrl,
-        timestamp: Date.now()
-      };
-      sessionStorage.setItem(AFTER_PHOTO_STORAGE_KEY, JSON.stringify(state));
-    } catch (e) {
-      console.error('Failed to save preview state', e);
-    }
-  }
 
   // Clear preview state after submit
   function clearPreviewState() {
@@ -127,6 +117,18 @@ export default function HistoryPage() {
 
     loadReports();
   }, [appUser, navigate]);
+
+  // Cleanup on unmount - revoke all pending preview URLs
+  useEffect(() => {
+    return () => {
+      pendingAfterUploads.current.forEach((pending) => {
+        if (pending.previewUrl) {
+          URL.revokeObjectURL(pending.previewUrl);
+        }
+      });
+      pendingAfterUploads.current.clear();
+    };
+  }, []);
 
   async function loadReports() {
     try {
@@ -237,20 +239,55 @@ export default function HistoryPage() {
       // Create preview URL
       const url = URL.createObjectURL(file);
 
+      // Store file in ref for upload
+      pendingAfterUploads.current.set(checkId, {
+        photoFile: file,
+        description: "",
+        previewUrl: url,
+      });
+
+      // Convert file to dataUrl for sessionStorage persistence
+      try {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          const state: PendingAfterPhotoState = {
+            reportId,
+            itemId,
+            checkId,
+            description: "",
+            dataUrl,
+            timestamp: Date.now()
+          };
+          sessionStorage.setItem(AFTER_PHOTO_STORAGE_KEY, JSON.stringify(state));
+        };
+        reader.readAsDataURL(file);
+      } catch {
+        // Ignore storage errors
+      }
+
       // Update local state to show preview - use functional update to ensure we get latest state
       setReports((prev) => {
         const report = prev.find((r) => r.reportId === reportId);
         const existingDesc = report?.checklistData?.items[itemId]?.checks.find((c) => c.id === checkId)?.afterDescription || "";
 
-        // Store in pending uploads with preview URL
+        // Update the description in ref (for upload later)
         pendingAfterUploads.current.set(checkId, {
-          photoFile: file,
+          ...pendingAfterUploads.current.get(checkId)!,
           description: existingDesc,
-          previewUrl: url,
         });
 
-        // Persist to sessionStorage for mobile page reload recovery
-        savePreviewState(reportId, itemId, checkId, file, existingDesc).catch(console.error);
+        // Update the description in sessionStorage as well
+        try {
+          const saved = sessionStorage.getItem(AFTER_PHOTO_STORAGE_KEY);
+          if (saved) {
+            const parsed: PendingAfterPhotoState = JSON.parse(saved);
+            parsed.description = existingDesc;
+            sessionStorage.setItem(AFTER_PHOTO_STORAGE_KEY, JSON.stringify(parsed));
+          }
+        } catch {
+          // Ignore storage errors
+        }
 
         return prev.map((r) => {
           if (r.reportId === reportId && r.checklistData) {

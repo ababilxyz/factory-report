@@ -49,35 +49,52 @@ export async function compressImage(file: File, maxWidth = 1024, quality = 0.8):
 }
 
 /**
+ * Create and return a persistent hidden file input element
+ */
+let persistentInput: HTMLInputElement | null = null;
+
+function getPersistentInput(): HTMLInputElement {
+  if (!persistentInput) {
+    persistentInput = document.createElement('input');
+    persistentInput.type = 'file';
+    persistentInput.accept = 'image/*';
+    persistentInput.capture = 'environment';
+    persistentInput.style.display = 'none';
+    document.body.appendChild(persistentInput);
+  }
+  return persistentInput;
+}
+
+/**
  * Capture a photo via the camera on mobile devices.
- * Opens the device camera directly (capture="environment").
+ * Uses a persistent hidden input to prevent page reloads.
  */
 export function openCameraCapture(): Promise<File> {
   return new Promise((resolve, reject) => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = 'image/*'
-    input.capture = 'environment' // Use rear camera
-
-    const cleanup = () => {
-      input.remove()
-    }
-
+    const input = getPersistentInput();
+    
     const handleChange = (e: Event) => {
-      cleanup()
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (file) resolve(file)
-      else reject(new Error('No file selected'))
-    }
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        resolve(file);
+      } else {
+        reject(new Error('No file selected'));
+      }
+    };
 
-    input.onchange = handleChange
-    input.oncancel = () => {
-      cleanup()
-      reject(new Error('Camera cancelled'))
-    }
+    const handleCancel = () => {
+      reject(new Error('Camera cancelled'));
+    };
 
-    input.click()
-  })
+    // Remove any existing listeners to prevent duplicates
+    input.removeEventListener('change', handleChange);
+    input.removeEventListener('cancel', handleCancel);
+    
+    input.addEventListener('change', handleChange);
+    input.addEventListener('cancel', handleCancel);
+
+    input.click();
+  });
 }
 
 /**
@@ -85,18 +102,18 @@ export function openCameraCapture(): Promise<File> {
  */
 export async function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(new Error('Failed to read file'))
-    reader.readAsDataURL(file)
-  })
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
 }
 
 /**
  * Convert a data URL back to a File
  */
 export async function dataUrlToFile(dataUrl: string, filename: string): Promise<File> {
-  const response = await fetch(dataUrl)
-  const blob = await response.blob()
-  return new File([blob], filename, { type: blob.type, lastModified: Date.now() })
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  return new File([blob], filename, { type: blob.type, lastModified: Date.now() });
 }
