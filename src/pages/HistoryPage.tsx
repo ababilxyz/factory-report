@@ -410,6 +410,11 @@ export default function HistoryPage() {
                                           alt="After"
                                           className="w-full max-h-24 object-cover rounded border border-factory-border"
                                         />
+                                        {check.afterAction && (
+                                          <p className="text-factory-muted text-xs mt-1 line-clamp-2">
+                                            Tindakan: {check.afterAction}
+                                          </p>
+                                        )}
                                       </div>
                                     ) : check.afterPhotoPreview ? (
                                       <div>
@@ -417,11 +422,36 @@ export default function HistoryPage() {
                                           After (Pending):
                                         </span>
                                         <div className="relative">
-                                        <img
-                                          src={check.afterPhotoPreview}
-                                          alt="After"
-                                          className="w-full max-h-24 object-cover rounded border border-factory-border"
-                                        />
+                                          <img
+                                            src={check.afterPhotoPreview}
+                                            alt="After"
+                                            className="w-full max-h-24 object-cover rounded border border-factory-border"
+                                          />
+                                          <button
+                                            onClick={() =>
+                                              handleRemoveAfterPreview(
+                                                report.reportId,
+                                                item.id,
+                                                check.id,
+                                              )
+                                            }
+                                            className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded"
+                                          >
+                                            <svg
+                                              className="w-3 h-3"
+                                              fill="none"
+                                              viewBox="0 0 24 24"
+                                              stroke="currentColor"
+                                              strokeWidth={2}
+                                            >
+                                              <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                d="M6 18L18 6M6 6l12 12"
+                                              />
+                                            </svg>
+                                          </button>
+                                        </div>
                                         <textarea
                                           value={
                                             pendingAfterActions.current.get(
@@ -454,37 +484,12 @@ export default function HistoryPage() {
                                           disabled={
                                             updatingCheckId === check.id
                                           }
-                                          className="absolute bottom-1 right-1 bg-green-600 text-white text-xs px-3 py-1 rounded min-h-[36px]"
+                                          className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white text-xs font-semibold rounded-lg py-2 min-h-[36px] mt-1"
                                         >
-                                            {updatingCheckId === check.id
-                                              ? "Updating..."
-                                              : "Submit Fix"}
-                                          </button>
-                                          <button
-                                            onClick={() =>
-                                              handleRemoveAfterPreview(
-                                                report.reportId,
-                                                item.id,
-                                                check.id,
-                                              )
-                                            }
-                                            className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded"
-                                          >
-                                            <svg
-                                              className="w-3 h-3"
-                                              fill="none"
-                                              viewBox="0 0 24 24"
-                                              stroke="currentColor"
-                                              strokeWidth={2}
-                                            >
-                                              <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                d="M6 18L18 6M6 6l12 12"
-                                              />
-                                            </svg>
-                                          </button>
-                                        </div>
+                                          {updatingCheckId === check.id
+                                            ? "Mengupload..."
+                                            : "Submit Fix"}
+                                        </button>
                                       </div>
                                     ) : (
                                       <motion.button
