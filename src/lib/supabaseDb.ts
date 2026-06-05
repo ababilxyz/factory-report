@@ -248,12 +248,17 @@ export async function getReportsByWorkerId(workerUid: string, limitCount = 50): 
 }
 
 export async function updateReportStatus(reportId: string, status: ReportStatus): Promise<void> {
+  console.log('[updateReportStatus] Attempting to update:', { reportId, status });
   const { error } = await supabase
     .from('reports')
     .update({ status, updated_at: Date.now() })
     .eq('report_id', reportId)
 
-  if (error) throw error
+  if (error) {
+    console.error('[updateReportStatus] Supabase error:', error);
+    throw new Error(`Failed to update status: ${error.message} (code: ${error.code})`);
+  }
+  console.log('[updateReportStatus] Success for:', reportId);
 }
 
 export async function updateUserProfile(uid: string, updates: Partial<Omit<AppUser, 'createdAt' | 'uid'>>): Promise<void> {

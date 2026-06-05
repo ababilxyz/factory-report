@@ -36,6 +36,7 @@ export default function AdminDashboard() {
     undefined,
   );
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   const {
     data: reports = [],
@@ -57,6 +58,7 @@ export default function AdminDashboard() {
     }) => updateReportStatus(reportId, status),
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ["reports"] });
+      setStatusError(null);
       // Update selectedReport locally so the modal stays open and reflects new status
       setSelectedReport((prev) => {
         if (prev && prev.reportId === variables.reportId) {
@@ -67,6 +69,7 @@ export default function AdminDashboard() {
     },
     onError: (err: Error) => {
       console.error("Failed to update status:", err);
+      setStatusError(err.message || "Gagal memperbarui status. Periksa koneksi atau izin database.");
     },
   });
 
@@ -446,7 +449,19 @@ export default function AdminDashboard() {
                 )}
 
                 {/* Status update actions */}
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2">
+                  {statusError && (
+                    <div className="bg-red-950/60 border border-red-800 text-red-300 text-xs rounded-lg px-3 py-2">
+                      {statusError}
+                      <button
+                        onClick={() => setStatusError(null)}
+                        className="float-right text-red-400 hover:text-red-200 font-bold"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
                   {selectedReport.status !== "in_progress" && (
                     <motion.button
                       whileTap={{ scale: 0.95 }}
@@ -477,6 +492,7 @@ export default function AdminDashboard() {
                       Mark Resolved
                     </motion.button>
                   )}
+                  </div>
                 </div>
               </div>
             </motion.div>
