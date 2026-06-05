@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { getReportsByWorkerId, updateCheckAfterPhoto } from "../lib/supabaseDb";
-import { openCameraCapture } from "../utils/imageUtils";
+import { getReportsByWorkerId } from "../lib/supabaseDb";
 import type { Report } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -12,10 +11,6 @@ export default function HistoryPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [updatingCheckId, setUpdatingCheckId] = useState<string | null>(null);
-
-  // Track pending after photo uploads
-  const pendingAfterUploads = useRef<Map<string, File>>(new Map());
 
   useEffect(() => {
     if (!appUser) {
@@ -76,129 +71,6 @@ export default function HistoryPage() {
       default:
         return "Unknown";
     }
-  }
-
-  // Check if check needs after photo (negative/neutral without after photo)
-  function needsAfterPhoto(check: any): boolean {
-    if (!check.selectedOption) return false;
-    const option = check.selectedOption;
-    const options = check.options || [];
-    const index = options.indexOf(option);
-    // Negative or neutral - but also needs to NOT have after photo
-    const isIssue =
-      options.length === 2
-        ? index === 1
-        : options.length === 3
-          ? index >= 1
-          : index === options.length - 1;
-    return isIssue && !check.afterPhotoUrl;
-  }
-
-  async function handleUpdateAfterPhoto(reportId: string, checkId: string) {
-    try {
-      const file = pendingAfterUploads.current.get(checkId);
-      if (!file) return;
-
-      setUpdatingCheckId(checkId);
-
-      await updateCheckAfterPhoto(reportId, checkId, file);
-
-      // Remove from pending
-      pendingAfterUploads.current.delete(checkId);
-
-      // Reload reports to get updated data
-      loadReports();
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to update after photo",
-      );
-    } finally {
-      setUpdatingCheckId(null);
-    }
-  }
-
-  // Handle taking after photo for a check
-  async function handleTakeAfterPhoto(
-    reportId: string,
-    itemId: string,
-    checkId: string,
-  ) {
-    try {
-      const file = await openCameraCapture();
-
-      // Create preview URL
-      const url = URL.createObjectURL(file);
-
-      // Store in pending uploads
-      pendingAfterUploads.current.set(checkId, file);
-
-      // Update local state to show preview
-      setReports((prev) =>
-        prev.map((report) => {
-          if (report.reportId === reportId && report.checklistData) {
-            const updatedItems = { ...report.checklistData.items };
-            if (updatedItems[itemId]) {
-              const checkIndex = updatedItems[itemId].checks.findIndex(
-                (c) => c.id === checkId,
-              );
-              if (checkIndex !== -1) {
-                updatedItems[itemId].checks[checkIndex].afterPhotoPreview = url;
-              }
-            }
-            return {
-              ...report,
-              checklistData: { ...report.checklistData, items: updatedItems },
-            };
-          }
-          return report;
-        }),
-      );
-    } catch (err) {
-      if (err instanceof Error && err.message !== "Camera cancelled") {
-        setError("Could not access camera: " + err.message);
-      }
-    }
-  }
-
-  // Remove preview and pending upload
-  function handleRemoveAfterPreview(
-    reportId: string,
-    itemId: string,
-    checkId: string,
-  ) {
-    const check = reports
-      .find((r) => r.reportId === reportId)
-      ?.checklistData?.items[itemId]?.checks.find((c) => c.id === checkId);
-
-    if (check?.afterPhotoPreview) {
-      URL.revokeObjectURL(check.afterPhotoPreview);
-    }
-    pendingAfterUploads.current.delete(checkId);
-
-    setReports((prev) =>
-      prev.map((report) => {
-        if (report.reportId === reportId && report.checklistData) {
-          const updatedItems = { ...report.checklistData.items };
-          if (updatedItems[itemId]) {
-            updatedItems[itemId].checks = updatedItems[itemId].checks.map(
-              (c) =>
-                c.id === checkId
-                  ? {
-                      ...c,
-                      afterPhotoPreview: undefined,
-                      afterPhotoFile: undefined,
-                    }
-                  : c,
-            );
-          }
-          return {
-            ...report,
-            checklistData: { ...report.checklistData, items: updatedItems },
-          };
-        }
-        return report;
-      }),
-    );
   }
 
   if (!appUser) return null;
@@ -309,9 +181,6 @@ export default function HistoryPage() {
                         </p>
                         <div className="space-y-2">
                           {item.checks.map((check) => {
-                            const needsPhoto = needsAfterPhoto(check);
-                            const hasAfterPhoto = !!check.afterPhotoUrl;
-
                             return (
                               <div
                                 key={check.id}
@@ -353,107 +222,25 @@ export default function HistoryPage() {
                                   </p>
                                 )}
 
-                                {/* After photo or upload button */}
-                                {needsPhoto && (
+                                {/* After photo (read-only, already submitted with report) */}
+                                {check.afterPhotoUrl && (
                                   <div className="mt-2">
-                                    {hasAfterPhoto ? (
-                                      <div>
-                                        <span className="text-green-400 text-xs block mb-1">
-                                          After:
-                                        </span>
-                                        <img
-                                          src={check.afterPhotoUrl}
-                                          alt="After"
-                                          className="w-full max-h-24 object-cover rounded border border-factory-border"
-                                        />
-                                      </div>
-                                    ) : check.afterPhotoPreview ? (
-                                      <div>
-                                        <span className="text-yellow-400 text-xs block mb-1">
-                                          After (Pending):
-                                        </span>
-                                        <div className="relative">
-                                          <img
-                                            src={check.afterPhotoPreview}
-                                            alt="After"
-                                            className="w-full max-h-24 object-cover rounded border border-factory-border"
-                                          />
-                                          <button
-                                            onClick={() =>
-                                              handleUpdateAfterPhoto(
-                                                report.reportId,
-                                                check.id,
-                                              )
-                                            }
-                                            disabled={
-                                              updatingCheckId === check.id
-                                            }
-                                            className="absolute bottom-1 right-1 bg-green-600 text-white text-xs px-3 py-1 rounded min-h-[36px]"
-                                          >
-                                            {updatingCheckId === check.id
-                                              ? "Updating..."
-                                              : "Submit Fix"}
-                                          </button>
-                                          <button
-                                            onClick={() =>
-                                              handleRemoveAfterPreview(
-                                                report.reportId,
-                                                item.id,
-                                                check.id,
-                                              )
-                                            }
-                                            className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded"
-                                          >
-                                            <svg
-                                              className="w-3 h-3"
-                                              fill="none"
-                                              viewBox="0 0 24 24"
-                                              stroke="currentColor"
-                                              strokeWidth={2}
-                                            >
-                                              <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                d="M6 18L18 6M6 6l12 12"
-                                              />
-                                            </svg>
-                                          </button>
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <motion.button
-                                        whileTap={{ scale: 0.97 }}
-                                        onClick={() =>
-                                          void handleTakeAfterPhoto(
-                                            report.reportId,
-                                            item.id,
-                                            check.id,
-                                          )
-                                        }
-                                        className="bg-factory-accent/20 hover:bg-factory-accent/30 text-factory-accent text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 min-h-[44px]"
-                                      >
-                                        <svg
-                                          className="w-4 h-4"
-                                          fill="none"
-                                          viewBox="0 0 24 24"
-                                          stroke="currentColor"
-                                          strokeWidth={2}
-                                        >
-                                          <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"
-                                          />
-                                          <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"
-                                          />
-                                        </svg>
-                                        Take After Photo
-                                      </motion.button>
-                                    )}
+                                    <span className="text-green-400 text-xs block mb-1">
+                                      After:
+                                    </span>
+                                    <img
+                                      src={check.afterPhotoUrl}
+                                      alt="After"
+                                      className="w-full max-h-24 object-cover rounded border border-factory-border"
+                                    />
                                   </div>
+                                )}
+
+                                {/* Action description (read-only) */}
+                                {check.afterDescription && (
+                                  <p className="text-factory-muted text-xs mt-1 line-clamp-2 italic">
+                                    Action taken: {check.afterDescription}
+                                  </p>
                                 )}
                               </div>
                             );

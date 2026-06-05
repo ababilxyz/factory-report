@@ -1,8 +1,6 @@
 import { supabase } from './supabase'
 import { v4 as uuidv4 } from 'uuid'
-import type { AppUser, Area, Report, CreateReportInput, ReportStatus, Item, ChecklistData, CheckItem } from '../types'
-import { uploadImage } from './storage'
-import { compressImage } from '../utils/imageUtils'
+import type { AppUser, Area, Report, CreateReportInput, ReportStatus, Item } from '../types'
 import { getDeviceFingerprint } from '../utils/deviceFingerprint'
 
 // ==================
@@ -190,79 +188,6 @@ export async function createReport(
   return reportId
 }
 
-// Update after photo for a specific check in an existing report
-export async function updateCheckAfterPhoto(
-  reportId: string,
-  checkId: string,
-  afterPhotoFile: File,
-  onProgress?: (percent: number) => void
-): Promise<void> {
-  // Get existing report
-  const { data: existingReport, error: fetchError } = await supabase
-    .from('reports')
-    .select('checklist_data')
-    .eq('report_id', reportId)
-    .single()
-
-  if (fetchError || !existingReport) {
-    throw new Error('Report not found')
-  }
-
-  // Upload the after photo
-  const compressed = await compressImage(afterPhotoFile)
-  const result = await uploadImage(compressed, onProgress)
-
-  // Update the checklist data with the after photo URL
-  const checklistData = existingReport.checklist_data as ChecklistData
-  if (!checklistData || !checklistData.items) {
-    throw new Error('Invalid checklist data')
-  }
-
-  // Find and update the check
-  for (const itemId in checklistData.items) {
-    const checkIndex = checklistData.items[itemId].checks.findIndex(
-      (c: CheckItem) => c.id === checkId,
-    )
-    if (checkIndex !== -1) {
-      checklistData.items[itemId].checks[checkIndex].afterPhotoUrl = result.url
-      checklistData.items[itemId].checks[checkIndex].afterPhotoFile = undefined
-      checklistData.items[itemId].checks[checkIndex].afterPhotoPreview = undefined
-      break
-    }
-  }
-
-  // Check if all checks now have after photos - update hasIssues accordingly
-  let allResolved = true
-  for (const itemId in checklistData.items) {
-    for (const check of checklistData.items[itemId].checks) {
-      const options = check.options || []
-      const selectedOption = check.selectedOption
-      if (selectedOption) {
-        const index = options.indexOf(selectedOption)
-        const isIssue = options.length === 2 
-          ? index === 1 
-          : (options.length === 3 ? index >= 1 : index === options.length - 1)
-        if (isIssue && !check.afterPhotoUrl) {
-          allResolved = false
-          break
-        }
-      }
-    }
-    if (!allResolved) break
-  }
-
-  // Update the report with modified checklist data
-  const { error: updateError } = await supabase
-    .from('reports')
-    .update({
-      checklist_data: checklistData,
-      status: allResolved ? 'resolved' : 'pending',
-      updated_at: Date.now(),
-    })
-    .eq('report_id', reportId)
-
-  if (updateError) throw updateError
-}
 
 export async function getReports(
   statusFilter?: ReportStatus,

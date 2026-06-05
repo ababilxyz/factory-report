@@ -278,6 +278,28 @@ export default function ReportFormPage() {
     }
   }
 
+  // Handle after photo description change
+  function handleAfterDescription(
+    itemId: string,
+    checkId: string,
+    desc: string,
+  ) {
+    setChecklistData((prev) => {
+      const newItems = { ...prev.items };
+      if (newItems[itemId]) {
+        newItems[itemId] = {
+          ...newItems[itemId],
+          checks: newItems[itemId].checks.map((check) =>
+            check.id === checkId
+              ? { ...check, afterDescription: desc }
+              : check,
+          ),
+        };
+      }
+      return { ...prev, items: newItems };
+    });
+  }
+
   // Handle check description change
   function handleCheckDescription(
     itemId: string,
@@ -337,12 +359,16 @@ export default function ReportFormPage() {
             const checkToClear = prev.items[itemId].checks.find(
               (c) => c.id === checkId,
             );
-            // Clean up preview URL for the specific check
+            // Clean up preview URLs for the specific check
             if (checkToClear?.issuePhotoPreview) {
               URL.revokeObjectURL(checkToClear.issuePhotoPreview);
             }
+            if (checkToClear?.afterPhotoPreview) {
+              URL.revokeObjectURL(checkToClear.afterPhotoPreview);
+            }
             // Remove from pending uploads
             pendingEvidenceUploads.current.delete(checkId);
+            pendingAfterUploads.current.delete(checkId);
           }
         }
 
@@ -397,7 +423,7 @@ export default function ReportFormPage() {
     );
     if (missingEvidence.length > 0) {
       setSubmitError(
-        `Evidence photo required for: ${missingEvidence.join(", ")}`,
+        `Before photo required for: ${missingEvidence.join(", ")}`,
       );
       return;
     }
@@ -416,7 +442,49 @@ export default function ReportFormPage() {
     );
     if (missingDescription.length > 0) {
       setSubmitError(
-        `Description required for: ${missingDescription.join(", ")}`,
+        `Abnormality description required for: ${missingDescription.join(", ")}`,
+      );
+      return;
+    }
+
+    // Validate after photo for negative/neutral selections
+    const missingAfterPhoto = Object.values(checklistData.items).flatMap(
+      (item) =>
+        item.checks
+          .filter(
+            (check) =>
+              check.selectedOption &&
+              requiresEvidence(check.selectedOption, check.options),
+          )
+          .filter(
+            (check) =>
+              !check.afterPhotoFile &&
+              !pendingAfterUploads.current.has(check.id),
+          )
+          .map((check) => check.label),
+    );
+    if (missingAfterPhoto.length > 0) {
+      setSubmitError(
+        `After photo (fix) required for: ${missingAfterPhoto.join(", ")}`,
+      );
+      return;
+    }
+
+    // Validate after description for negative/neutral selections
+    const missingAfterDescription = Object.values(checklistData.items).flatMap(
+      (item) =>
+        item.checks
+          .filter(
+            (check) =>
+              check.selectedOption &&
+              requiresEvidence(check.selectedOption, check.options),
+          )
+          .filter((check) => !check.afterDescription?.trim())
+          .map((check) => check.label),
+    );
+    if (missingAfterDescription.length > 0) {
+      setSubmitError(
+        `Action description required for: ${missingAfterDescription.join(", ")}`,
       );
       return;
     }
@@ -426,51 +494,90 @@ export default function ReportFormPage() {
     setUploadProgress(0);
 
     try {
-      // Collect all evidence photos to upload (issue photos only)
-      const issuePhotosToUpload: Array<{
+      // Collect all evidence photos to upload (issue photos + after photos)
+      const evidenceToUpload: Array<{
         checkId: string;
         photoFile: File;
         description: string;
+        type: "issue" | "after";
       }> = [];
 
-      // Get photos from pending uploads map
+      // Get issue photos from pending uploads map
       for (const [checkId, evidence] of pendingEvidenceUploads.current) {
-        issuePhotosToUpload.push({
+        evidenceToUpload.push({
           checkId,
           photoFile: evidence.photoFile,
           description: evidence.description,
+          type: "issue",
         });
       }
 
-      // Also check checklist items for existing files
+      // Also check checklist items for existing issue photo files not yet in pending
       for (const item of Object.values(checklistData.items)) {
         for (const check of item.checks) {
           if (
             check.issuePhotoFile &&
             !pendingEvidenceUploads.current.has(check.id)
           ) {
-            issuePhotosToUpload.push({
+            evidenceToUpload.push({
               checkId: check.id,
               photoFile: check.issuePhotoFile,
               description: check.issueDescription || "",
+              type: "issue",
             });
           }
         }
       }
 
-      const totalPending = issuePhotosToUpload.length;
+      // Get after photos from pending uploads map
+      for (const [checkId, photoFile] of pendingAfterUploads.current) {
+        const checkDesc = Object.values(checklistData.items)
+          .flatMap((item) => item.checks)
+          .find((c) => c.id === checkId)?.afterDescription || "";
+        evidenceToUpload.push({
+          checkId,
+          photoFile,
+          description: checkDesc,
+          type: "after",
+        });
+      }
+
+      // Also check checklist items for existing after photo files not yet in pending
+      for (const item of Object.values(checklistData.items)) {
+        for (const check of item.checks) {
+          if (
+            check.afterPhotoFile &&
+            !pendingAfterUploads.current.has(check.id)
+          ) {
+            evidenceToUpload.push({
+              checkId: check.id,
+              photoFile: check.afterPhotoFile,
+              description: check.afterDescription || "",
+              type: "after",
+            });
+          }
+        }
+      }
+
+      const totalPending = evidenceToUpload.length;
       let uploaded = 0;
 
-      // Track uploaded URLs
-      const uploadedUrls = new Map<string, string>();
+      // Track uploaded URLs - separate maps for issue and after photos
+      const uploadedIssueUrls = new Map<string, string>();
+      const uploadedAfterUrls = new Map<string, string>();
+      const uploadedDescriptions = new Map<string, string>();
 
-      // Upload issue photos
-      for (const evidence of issuePhotosToUpload) {
+      // Upload all photos
+      for (const evidence of evidenceToUpload) {
         const compressed = await compressImage(evidence.photoFile);
         const result = await uploadImage(compressed);
 
-        // Store the URL
-        uploadedUrls.set(evidence.checkId, result.url);
+        if (evidence.type === "issue") {
+          uploadedIssueUrls.set(evidence.checkId, result.url);
+        } else {
+          uploadedAfterUrls.set(evidence.checkId, result.url);
+        }
+        uploadedDescriptions.set(evidence.checkId, evidence.description);
 
         uploaded++;
         setUploadProgress(Math.round((uploaded / totalPending) * 100));
@@ -479,26 +586,50 @@ export default function ReportFormPage() {
       // Build final checklist with uploaded URLs (deep clone to preserve hasIssues)
       const finalChecklist = JSON.parse(JSON.stringify(checklistData));
 
-      // Apply uploaded URLs to final checklist
-      for (const [checkId, url] of uploadedUrls) {
-        const evidence = pendingEvidenceUploads.current.get(checkId);
-        if (evidence) {
-          for (const itemId in finalChecklist.items) {
-            const checkIndex = finalChecklist.items[itemId].checks.findIndex(
-              (c: any) => c.id === checkId,
-            );
-            if (checkIndex !== -1) {
-              finalChecklist.items[itemId].checks[checkIndex].issuePhotoUrl =
-                url;
-              finalChecklist.items[itemId].checks[checkIndex].issuePhotoFile =
-                undefined;
+      // Apply uploaded issue photo URLs
+      for (const [checkId, url] of uploadedIssueUrls) {
+        for (const itemId in finalChecklist.items) {
+          const checkIndex = finalChecklist.items[itemId].checks.findIndex(
+            (c: any) => c.id === checkId,
+          );
+          if (checkIndex !== -1) {
+            finalChecklist.items[itemId].checks[checkIndex].issuePhotoUrl = url;
+            finalChecklist.items[itemId].checks[checkIndex].issuePhotoFile =
+              undefined;
+            finalChecklist.items[itemId].checks[
+              checkIndex
+            ].issuePhotoPreview = undefined;
+            const desc = uploadedDescriptions.get(checkId);
+            if (desc) {
               finalChecklist.items[itemId].checks[
                 checkIndex
-              ].issuePhotoPreview = undefined;
-              finalChecklist.items[itemId].checks[checkIndex].issueDescription =
-                evidence.description;
-              break;
+              ].issueDescription = desc;
             }
+            break;
+          }
+        }
+      }
+
+      // Apply uploaded after photo URLs
+      for (const [checkId, url] of uploadedAfterUrls) {
+        for (const itemId in finalChecklist.items) {
+          const checkIndex = finalChecklist.items[itemId].checks.findIndex(
+            (c: any) => c.id === checkId,
+          );
+          if (checkIndex !== -1) {
+            finalChecklist.items[itemId].checks[checkIndex].afterPhotoUrl = url;
+            finalChecklist.items[itemId].checks[checkIndex].afterPhotoFile =
+              undefined;
+            finalChecklist.items[itemId].checks[
+              checkIndex
+            ].afterPhotoPreview = undefined;
+            const desc = uploadedDescriptions.get(checkId);
+            if (desc) {
+              finalChecklist.items[itemId].checks[
+                checkIndex
+              ].afterDescription = desc;
+            }
+            break;
           }
         }
       }
@@ -841,10 +972,10 @@ export default function ReportFormPage() {
                                 />
                               </div>
 
-                              {/* After/Fix Photo capture */}
+                              {/* After/Fix Photo capture - required for issues */}
                               <div>
                                 <span className="text-xs text-green-400 block mb-1">
-                                  After Photo (Fix/Completed)
+                                  After Photo (Fix/Completed) <span className="text-red-400">*</span>
                                 </span>
                                 {check.afterPhotoPreview ? (
                                   <div className="relative rounded-lg overflow-hidden bg-factory-card border border-factory-border max-w-xs">
@@ -870,6 +1001,7 @@ export default function ReportFormPage() {
                                                         undefined,
                                                       afterPhotoFile: undefined,
                                                       afterPhotoUrl: undefined,
+                                                      afterDescription: undefined,
                                                     }
                                                   : c,
                                               ),
@@ -933,6 +1065,27 @@ export default function ReportFormPage() {
                                     Take After Photo
                                   </motion.button>
                                 )}
+                              </div>
+
+                              {/* Action description - required for issues */}
+                              <div>
+                                <span className="text-xs text-green-400 block mb-1">
+                                  Deskripsi Tindakan yang Dilakukan <span className="text-red-400">*</span>
+                                </span>
+                                <textarea
+                                  value={check.afterDescription || ""}
+                                  onChange={(e) =>
+                                    handleAfterDescription(
+                                      item.id,
+                                      check.id,
+                                      e.target.value,
+                                    )
+                                  }
+                                  rows={2}
+                                  maxLength={300}
+                                  placeholder="Jelaskan tindakan yang dilakukan..."
+                                  className="w-full bg-factory-card border border-factory-border rounded-lg px-3 py-2 text-white placeholder-factory-muted focus:outline-none focus:border-green-500 transition-colors resize-none text-xs"
+                                />
                               </div>
                             </div>
                           )}
