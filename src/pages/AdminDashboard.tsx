@@ -55,9 +55,18 @@ export default function AdminDashboard() {
       reportId: string;
       status: ReportStatus;
     }) => updateReportStatus(reportId, status),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ["reports"] });
-      setSelectedReport(null);
+      // Update selectedReport locally so the modal stays open and reflects new status
+      setSelectedReport((prev) => {
+        if (prev && prev.reportId === variables.reportId) {
+          return { ...prev, status: variables.status };
+        }
+        return prev;
+      });
+    },
+    onError: (err: Error) => {
+      console.error("Failed to update status:", err);
     },
   });
 
@@ -350,31 +359,80 @@ export default function AdminDashboard() {
                               {item.name}
                             </p>
                             {item.checks.map((check) => {
-                              const hasIssue = check.issuePhotoUrl;
+                              // Determine option status for background color
+                              const options = check.options || [];
+                              const selectedOption = check.selectedOption;
+                              const index = selectedOption
+                                ? options.indexOf(selectedOption)
+                                : -1;
+                              let statusBg = "";
+                              if (selectedOption && index !== -1) {
+                                if (options.length === 2) {
+                                  statusBg =
+                                    index === 0
+                                      ? "bg-green-900/40"
+                                      : "bg-red-900/40";
+                                } else if (options.length === 3) {
+                                  statusBg =
+                                    index === 0
+                                      ? "bg-green-900/40"
+                                      : index === 1
+                                        ? "bg-yellow-900/40"
+                                        : "bg-red-900/40";
+                                } else {
+                                  statusBg =
+                                    index === options.length - 1
+                                      ? "bg-red-900/40"
+                                      : "bg-green-900/40";
+                                }
+                              }
                               const hasAfter = check.afterPhotoUrl;
+                              const hasAfterDesc = check.afterDescription;
                               return (
                                 <div
                                   key={check.id}
-                                  className="flex items-center justify-between text-xs py-1"
+                                  className={`p-2 rounded-lg ${statusBg}`}
                                 >
-                                  <span className="text-white truncate">
-                                    {check.label}
-                                  </span>
-                                  <div className="flex items-center gap-1">
-                                    {hasIssue && (
-                                      <span className="text-red-400 text-xs">
-                                        Before
-                                      </span>
-                                    )}
-                                    {hasAfter && (
-                                      <span className="text-green-400 text-xs">
-                                        After
-                                      </span>
-                                    )}
-                                    <span className="text-factory-muted">
-                                      {check.selectedOption || "-"}
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-white truncate">
+                                      {check.label}
+                                    </span>
+                                    <span className="text-factory-muted ml-2">
+                                      {selectedOption || "-"}
                                     </span>
                                   </div>
+                                  {/* Before photo */}
+                                  {check.issuePhotoUrl && (
+                                    <div className="mt-1">
+                                      <span className="text-red-400 text-[10px] block">
+                                        Before:
+                                      </span>
+                                      <img
+                                        src={check.issuePhotoUrl}
+                                        alt="Before"
+                                        className="w-full max-h-20 object-cover rounded border border-factory-border"
+                                      />
+                                    </div>
+                                  )}
+                                  {/* After photo */}
+                                  {hasAfter && (
+                                    <div className="mt-1">
+                                      <span className="text-green-400 text-[10px] block">
+                                        After:
+                                      </span>
+                                      <img
+                                        src={check.afterPhotoUrl}
+                                        alt="After"
+                                        className="w-full max-h-20 object-cover rounded border border-factory-border"
+                                      />
+                                    </div>
+                                  )}
+                                  {/* Action description */}
+                                  {hasAfterDesc && (
+                                    <p className="text-factory-muted text-[10px] mt-1 italic">
+                                      Action: {check.afterDescription}
+                                    </p>
+                                  )}
                                 </div>
                               );
                             })}

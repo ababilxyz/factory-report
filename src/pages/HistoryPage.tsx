@@ -2,8 +2,29 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { getReportsByWorkerId } from "../lib/supabaseDb";
-import type { Report } from "../types";
+import type { Report, CheckItem } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
+
+// Determine background class based on option status
+function getCheckStatusBg(check: CheckItem): string {
+  const options = check.options || [];
+  const selectedOption = check.selectedOption;
+  if (!selectedOption) return "";
+
+  const index = options.indexOf(selectedOption);
+  if (index === -1) return "";
+
+  if (options.length === 2) {
+    return index === 0 ? "bg-green-900/30" : "bg-red-900/30";
+  }
+  if (options.length === 3) {
+    if (index === 0) return "bg-green-900/30";
+    if (index === 1) return "bg-yellow-900/30";
+    return "bg-red-900/30";
+  }
+  // Default: last option = negative
+  return index === options.length - 1 ? "bg-red-900/30" : "bg-green-900/30";
+}
 
 export default function HistoryPage() {
   const { appUser } = useAuth();
@@ -181,10 +202,12 @@ export default function HistoryPage() {
                         </p>
                         <div className="space-y-2">
                           {item.checks.map((check) => {
+                            const checkBg = getCheckStatusBg(check);
+
                             return (
                               <div
                                 key={check.id}
-                                className="p-2 bg-factory-dark/50 rounded-lg"
+                                className={`p-2 bg-factory-dark/50 rounded-lg ${checkBg}`}
                               >
                                 <div className="flex items-center justify-between mb-1">
                                   <span className="text-white text-xs font-medium">
