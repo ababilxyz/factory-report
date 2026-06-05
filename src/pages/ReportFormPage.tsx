@@ -115,25 +115,6 @@ function getOptionButtonStyle(
   }
 }
 
-// Get after photo button style based on status
-function getAfterPhotoButtonStyle(
-  hasAfterPhoto: boolean,
-  status: "positive" | "neutral" | "negative",
-) {
-  const baseStyle = hasAfterPhoto
-    ? "bg-green-900/50 text-green-300 border border-green-800"
-    : "bg-factory-accent/20 hover:bg-factory-accent/30 text-factory-accent";
-
-  // For pending status, show orange
-  if (status === "neutral") {
-    return hasAfterPhoto
-      ? "bg-yellow-900/50 text-yellow-300 border border-yellow-800"
-      : "bg-factory-accent/20 hover:bg-factory-accent/30 text-factory-accent";
-  }
-
-  return baseStyle;
-}
-
 export default function ReportFormPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -155,9 +136,6 @@ export default function ReportFormPage() {
         item.checks.forEach((check) => {
           if (check.issuePhotoPreview) {
             URL.revokeObjectURL(check.issuePhotoPreview);
-          }
-          if (check.afterPhotoPreview) {
-            URL.revokeObjectURL(check.afterPhotoPreview);
           }
         });
       });
@@ -183,8 +161,6 @@ export default function ReportFormPage() {
   const pendingEvidenceUploads = useRef<
     Map<string, { photoFile: File; description: string }>
   >(new Map());
-  // Track pending after photo uploads
-  const pendingAfterUploads = useRef<Map<string, File>>(new Map());
 
   // Redirect if no scan result
   useEffect(() => {
@@ -232,39 +208,6 @@ export default function ReportFormPage() {
             checks: newItems[itemId].checks.map((check) =>
               check.id === checkId
                 ? { ...check, issuePhotoPreview: url, issuePhotoFile: file }
-                : check,
-            ),
-          };
-        }
-        return { ...prev, items: newItems };
-      });
-    } catch (err) {
-      if (err instanceof Error && err.message !== "Camera cancelled") {
-        setSubmitError("Could not access camera. " + err.message);
-      }
-    }
-  }
-
-  // Handle taking after photo for check item (fix/cleanup)
-  async function handleTakeAfterPhoto(itemId: string, checkId: string) {
-    try {
-      const file = await openCameraCapture();
-
-      // Store in pending uploads map
-      pendingAfterUploads.current.set(checkId, file);
-
-      // Create preview URL
-      const url = URL.createObjectURL(file);
-
-      // Update checklist with preview
-      setChecklistData((prev) => {
-        const newItems = { ...prev.items };
-        if (newItems[itemId]) {
-          newItems[itemId] = {
-            ...newItems[itemId],
-            checks: newItems[itemId].checks.map((check) =>
-              check.id === checkId
-                ? { ...check, afterPhotoPreview: url, afterPhotoFile: file }
                 : check,
             ),
           };
@@ -557,6 +500,9 @@ export default function ReportFormPage() {
           <p className="text-factory-muted mt-2">
             Your report has been sent to the team leader.
           </p>
+          <p className="text-factory-muted text-sm mt-1">
+            You can add after photos in your report history.
+          </p>
         </div>
         <motion.button
           whileTap={{ scale: 0.95 }}
@@ -688,9 +634,6 @@ export default function ReportFormPage() {
                       const showEvidence =
                         check.selectedOption &&
                         requiresEvidence(check.selectedOption, check.options);
-                      const optStatus = check.selectedOption
-                        ? getOptionStatus(check.selectedOption, check.options)
-                        : "positive";
 
                       return (
                         <div key={check.id} className="flex flex-col gap-2">
@@ -839,100 +782,6 @@ export default function ReportFormPage() {
                                   placeholder="Describe the abnormality..."
                                   className="w-full bg-factory-card border border-factory-border rounded-lg px-3 py-2 text-white placeholder-factory-muted focus:outline-none focus:border-yellow-500 transition-colors resize-none text-xs"
                                 />
-                              </div>
-
-                              {/* After/Fix Photo capture */}
-                              <div>
-                                <span className="text-xs text-green-400 block mb-1">
-                                  After Photo (Fix/Completed)
-                                </span>
-                                {check.afterPhotoPreview ? (
-                                  <div className="relative rounded-lg overflow-hidden bg-factory-card border border-factory-border max-w-xs">
-                                    <img
-                                      src={check.afterPhotoPreview}
-                                      alt="After"
-                                      className="w-full max-h-32 object-cover"
-                                    />
-                                    <button
-                                      onClick={() => {
-                                        setChecklistData((prev) => {
-                                          const newItems = { ...prev.items };
-                                          if (newItems[item.id]) {
-                                            newItems[item.id] = {
-                                              ...newItems[item.id],
-                                              checks: newItems[
-                                                item.id
-                                              ].checks.map((c) =>
-                                                c.id === check.id
-                                                  ? {
-                                                      ...c,
-                                                      afterPhotoPreview:
-                                                        undefined,
-                                                      afterPhotoFile: undefined,
-                                                      afterPhotoUrl: undefined,
-                                                    }
-                                                  : c,
-                                              ),
-                                            };
-                                          }
-                                          return { ...prev, items: newItems };
-                                        });
-                                        pendingAfterUploads.current.delete(
-                                          check.id,
-                                        );
-                                      }}
-                                      className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded"
-                                    >
-                                      <svg
-                                        className="w-3 h-3"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                        strokeWidth={2}
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          d="M6 18L18 6M6 6l12 12"
-                                        />
-                                      </svg>
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <motion.button
-                                    whileTap={{ scale: 0.97 }}
-                                    onClick={() =>
-                                      void handleTakeAfterPhoto(
-                                        item.id,
-                                        check.id,
-                                      )
-                                    }
-                                    className={`text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 min-h-[44px] ${getAfterPhotoButtonStyle(
-                                      !!check.afterPhotoUrl,
-                                      optStatus,
-                                    )}`}
-                                  >
-                                    <svg
-                                      className="w-4 h-4"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
-                                      strokeWidth={2}
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"
-                                      />
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"
-                                      />
-                                    </svg>
-                                    Take After Photo
-                                  </motion.button>
-                                )}
                               </div>
                             </div>
                           )}

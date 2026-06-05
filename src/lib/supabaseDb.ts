@@ -195,7 +195,8 @@ export async function updateCheckAfterPhoto(
   reportId: string,
   checkId: string,
   afterPhotoFile: File,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  afterDescription?: string,
 ): Promise<void> {
   // Get existing report
   const { data: existingReport, error: fetchError } = await supabase
@@ -227,6 +228,9 @@ export async function updateCheckAfterPhoto(
       checklistData.items[itemId].checks[checkIndex].afterPhotoUrl = result.url
       checklistData.items[itemId].checks[checkIndex].afterPhotoFile = undefined
       checklistData.items[itemId].checks[checkIndex].afterPhotoPreview = undefined
+      if (afterDescription !== undefined) {
+        checklistData.items[itemId].checks[checkIndex].afterDescription = afterDescription
+      }
       break
     }
   }
