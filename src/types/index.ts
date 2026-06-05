@@ -39,23 +39,23 @@ export interface QrPayload {
 export type ReportStatus = 'pending' | 'in_progress' | 'resolved'
 
 export interface CheckItem {
-    id: string  // Format: "label(code)" e.g., "identitas(D-1.01)"
-    label: string
-    code: string  // Check-specific code suffix
-    options: string[]  // Dynamic options like "Baik", "Rusak", "Sesuai", "Tidak Sesuai"
-    selectedOption?: string  // The selected option label
-    order?: number  // Display order
-    // Before/Issue evidence (for negative/neutral)
-    issuePhotoUrl?: string  // Photo for issue (negative/neutral option)
-    issueDescription?: string  // Description for issue
-    issuePhotoFile?: File  // Photo file for upload (transient)
-    issuePhotoPreview?: string  // Photo preview URL (transient)
-    // After/Fix evidence (for after the issue is fixed)
-    afterPhotoUrl?: string  // Photo showing the fix/cleanup
-    afterPhotoFile?: File  // After photo file for upload (transient)
-    afterPhotoPreview?: string  // After photo preview URL (transient)
-    afterAction?: string  // Description of action taken to fix the issue
-}
+     id: string  // Format: "label(code)" e.g., "identitas(D-1.01)"
+     label: string
+     code: string  // Check-specific code suffix
+     options: string[]  // Dynamic options like "Baik", "Rusak", "Sesuai", "Tidak Sesuai"
+     selectedOption?: string  // The selected option label
+     order?: number  // Display order
+     // Before/Issue evidence (for negative/neutral)
+     issuePhotoUrl?: string  // Photo for issue (negative/neutral option)
+     issueDescription?: string  // Description for issue
+     issuePhotoFile?: File  // Photo file for upload (transient)
+     issuePhotoPreview?: string  // Photo preview URL (transient)
+     // After/Fix evidence (for after the issue is fixed)
+     afterPhotoUrl?: string  // Photo showing the fix/cleanup
+     afterPhotoFile?: File  // After photo file for upload (transient)
+     afterPhotoPreview?: string  // After photo preview URL (transient)
+     afterPhotoDescription?: string  // Action taken description
+   }
 
 export interface Item {
     id: string  // Format: "itemid" e.g., "item-1"
