@@ -59,13 +59,44 @@ export function openCameraCapture(): Promise<File> {
     input.accept = 'image/*'
     input.capture = 'environment' // Use rear camera
 
-    input.onchange = (e) => {
+    const cleanup = () => {
+      input.remove()
+    }
+
+    const handleChange = (e: Event) => {
+      cleanup()
       const file = (e.target as HTMLInputElement).files?.[0]
       if (file) resolve(file)
       else reject(new Error('No file selected'))
     }
 
-    input.oncancel = () => reject(new Error('Camera cancelled'))
+    input.onchange = handleChange
+    input.oncancel = () => {
+      cleanup()
+      reject(new Error('Camera cancelled'))
+    }
+
     input.click()
   })
+}
+
+/**
+ * Convert a file to a data URL for serialization/storage
+ */
+export async function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(new Error('Failed to read file'))
+    reader.readAsDataURL(file)
+  })
+}
+
+/**
+ * Convert a data URL back to a File
+ */
+export async function dataUrlToFile(dataUrl: string, filename: string): Promise<File> {
+  const response = await fetch(dataUrl)
+  const blob = await response.blob()
+  return new File([blob], filename, { type: blob.type, lastModified: Date.now() })
 }

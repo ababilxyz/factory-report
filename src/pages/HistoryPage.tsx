@@ -2,9 +2,21 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { getReportsByWorkerId, updateCheckAfterPhoto } from "../lib/supabaseDb";
-import { openCameraCapture } from "../utils/imageUtils";
+import { openCameraCapture, fileToDataUrl, dataUrlToFile } from "../utils/imageUtils";
 import type { Report } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
+
+// Storage key for persisting after photo state
+const AFTER_PHOTO_STORAGE_KEY = 'history-after-photo-state';
+
+interface PendingAfterPhotoState {
+  reportId: string;
+  itemId: string;
+  checkId: string;
+  description: string;
+  dataUrl: string;
+  timestamp: number;
+}
 
 export default function HistoryPage() {
   const { appUser } = useAuth();
@@ -14,10 +26,98 @@ export default function HistoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [updatingCheckId, setUpdatingCheckId] = useState<string | null>(null);
 
-  // Track pending after photo uploads with description
+  // Track pending after photo uploads
   const pendingAfterUploads = useRef<
-    Map<string, { photoFile: File; description: string }>
+    Map<string, { photoFile: File | null; description: string; previewUrl: string }>
   >(new Map());
+
+  // Restore preview state from sessionStorage when reports are loaded
+  useEffect(() => {
+    // Only restore if we have reports loaded and haven't already restored
+    if (reports.length === 0) return;
+    
+    const saved = sessionStorage.getItem(AFTER_PHOTO_STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed: PendingAfterPhotoState = JSON.parse(saved);
+        if (parsed && parsed.checkId) {
+          // Check if this report still exists in the loaded reports
+          const reportExists = reports.find(r => r.reportId === parsed.reportId);
+          if (reportExists) {
+            // Check if we've already restored this state (preview URL already exists)
+            const alreadyRestored = reportExists.checklistData?.items[parsed.itemId]?.checks.find(
+              (c: any) => c.id === parsed.checkId && c.afterPhotoPreview
+            );
+            if (alreadyRestored) {
+              sessionStorage.removeItem(AFTER_PHOTO_STORAGE_KEY);
+              return;
+            }
+            
+            // Convert dataUrl back to File for upload
+            dataUrlToFile(parsed.dataUrl, `after-${parsed.checkId}.jpg`).then((file) => {
+              const previewUrl = URL.createObjectURL(file);
+              pendingAfterUploads.current.set(parsed.checkId, {
+                photoFile: file,
+                description: parsed.description || "",
+                previewUrl,
+              });
+              
+              // Update state to show preview
+              setReports((prev) => {
+                return prev.map((r) => {
+                  if (r.reportId === parsed.reportId && r.checklistData) {
+                    const updatedItems = { ...r.checklistData.items };
+                    if (updatedItems[parsed.itemId]) {
+                      const checkIndex = updatedItems[parsed.itemId].checks.findIndex(
+                        (c) => c.id === parsed.checkId,
+                      );
+                      if (checkIndex !== -1) {
+                        updatedItems[parsed.itemId].checks[checkIndex] = {
+                          ...updatedItems[parsed.itemId].checks[checkIndex],
+                          afterPhotoPreview: previewUrl,
+                          afterDescription: parsed.description || "",
+                        };
+                      }
+                    }
+                    return {
+                      ...r,
+                      checklistData: { ...r.checklistData, items: updatedItems },
+                    };
+                  }
+                  return r;
+                });
+              });
+            }).catch(console.error);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse saved preview state', e);
+      }
+    }
+  }, [reports]);
+
+  // Save preview state to sessionStorage when camera opens (before potential page reload)
+  async function savePreviewState(reportId: string, itemId: string, checkId: string, file: File, desc: string) {
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      const state: PendingAfterPhotoState = {
+        reportId,
+        itemId,
+        checkId,
+        description: desc,
+        dataUrl,
+        timestamp: Date.now()
+      };
+      sessionStorage.setItem(AFTER_PHOTO_STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      console.error('Failed to save preview state', e);
+    }
+  }
+
+  // Clear preview state after submit
+  function clearPreviewState() {
+    sessionStorage.removeItem(AFTER_PHOTO_STORAGE_KEY);
+  }
 
   useEffect(() => {
     if (!appUser) {
@@ -103,10 +203,16 @@ export default function HistoryPage() {
 
       setUpdatingCheckId(checkId);
 
+      // Revoke preview URL before upload
+      if (pending.previewUrl) {
+        URL.revokeObjectURL(pending.previewUrl);
+      }
+
       await updateCheckAfterPhoto(reportId, checkId, pending.photoFile, undefined, pending.description);
 
-      // Remove from pending
+      // Remove from pending and clear storage
       pendingAfterUploads.current.delete(checkId);
+      clearPreviewState();
 
       // Reload reports to get updated data
       loadReports();
@@ -119,40 +225,41 @@ export default function HistoryPage() {
     }
   }
 
-  // Handle taking after photo for a check
-  async function handleTakeAfterPhoto(
-    reportId: string,
-    itemId: string,
-    checkId: string,
-  ) {
+// Handle taking after photo for a check
+   async function handleTakeAfterPhoto(
+     reportId: string,
+     itemId: string,
+     checkId: string,
+   ) {
     try {
       const file = await openCameraCapture();
 
       // Create preview URL
       const url = URL.createObjectURL(file);
 
-      // Store in pending uploads with existing description if any
-      const existingDescription = reports
-        .find((r) => r.reportId === reportId)
-        ?.checklistData?.items[itemId]?.checks.find((c) => c.id === checkId)?.afterDescription || "";
-      
-      pendingAfterUploads.current.set(checkId, {
-        photoFile: file,
-        description: existingDescription,
-      });
-
       // Update local state to show preview - use functional update to ensure we get latest state
       setReports((prev) => {
-        return prev.map((report) => {
-          if (report.reportId === reportId && report.checklistData) {
-            const updatedItems = { ...report.checklistData.items };
+        const report = prev.find((r) => r.reportId === reportId);
+        const existingDesc = report?.checklistData?.items[itemId]?.checks.find((c) => c.id === checkId)?.afterDescription || "";
+
+        // Store in pending uploads with preview URL
+        pendingAfterUploads.current.set(checkId, {
+          photoFile: file,
+          description: existingDesc,
+          previewUrl: url,
+        });
+
+        // Persist to sessionStorage for mobile page reload recovery
+        savePreviewState(reportId, itemId, checkId, file, existingDesc).catch(console.error);
+
+        return prev.map((r) => {
+          if (r.reportId === reportId && r.checklistData) {
+            const updatedItems = { ...r.checklistData.items };
             if (updatedItems[itemId]) {
               const checkIndex = updatedItems[itemId].checks.findIndex(
                 (c) => c.id === checkId,
               );
               if (checkIndex !== -1) {
-                // Preserve existing afterDescription and add preview
-                const existingDesc = updatedItems[itemId].checks[checkIndex].afterDescription || existingDescription;
                 updatedItems[itemId].checks[checkIndex] = {
                   ...updatedItems[itemId].checks[checkIndex],
                   afterPhotoPreview: url,
@@ -161,11 +268,11 @@ export default function HistoryPage() {
               }
             }
             return {
-              ...report,
-              checklistData: { ...report.checklistData, items: updatedItems },
+              ...r,
+              checklistData: { ...r.checklistData, items: updatedItems },
             };
           }
-          return report;
+          return r;
         });
       });
     } catch (err) {
@@ -212,46 +319,52 @@ export default function HistoryPage() {
     );
   }
 
-  // Remove preview and pending upload
-  function handleRemoveAfterPreview(
-    reportId: string,
-    itemId: string,
-    checkId: string,
-  ) {
-    const check = reports
-      .find((r) => r.reportId === reportId)
-      ?.checklistData?.items[itemId]?.checks.find((c) => c.id === checkId);
-
-    if (check?.afterPhotoPreview) {
-      URL.revokeObjectURL(check.afterPhotoPreview);
-    }
-    pendingAfterUploads.current.delete(checkId);
-
-    setReports((prev) =>
-      prev.map((report) => {
-        if (report.reportId === reportId && report.checklistData) {
-          const updatedItems = { ...report.checklistData.items };
-          if (updatedItems[itemId]) {
-            updatedItems[itemId].checks = updatedItems[itemId].checks.map(
-              (c) =>
-                c.id === checkId
-                  ? {
-                      ...c,
-                      afterPhotoPreview: undefined,
-                      afterPhotoFile: undefined,
-                    }
-                  : c,
-            );
-          }
-          return {
-            ...report,
-            checklistData: { ...report.checklistData, items: updatedItems },
-          };
-        }
-        return report;
-      }),
-    );
-  }
+// Remove preview and pending upload
+   function handleRemoveAfterPreview(
+     reportId: string,
+     itemId: string,
+     checkId: string,
+   ) {
+     // Clean up preview URL from pending uploads ref
+     const pending = pendingAfterUploads.current.get(checkId);
+     if (pending?.previewUrl) {
+       URL.revokeObjectURL(pending.previewUrl);
+       clearPreviewState();
+     }
+    
+     // Also clean up from current state if it exists
+     setReports((prev) => {
+       const report = prev.find((r) => r.reportId === reportId);
+       const check = report?.checklistData?.items[itemId]?.checks.find((c) => c.id === checkId);
+       // Only revoke if not already done above
+       if (check?.afterPhotoPreview && !pending?.previewUrl) {
+         URL.revokeObjectURL(check.afterPhotoPreview);
+       }
+       return prev.map((r) => {
+         if (r.reportId === reportId && r.checklistData) {
+           const updatedItems = { ...r.checklistData.items };
+           if (updatedItems[itemId]) {
+             updatedItems[itemId].checks = updatedItems[itemId].checks.map(
+               (c) =>
+                 c.id === checkId
+                   ? {
+                       ...c,
+                       afterPhotoPreview: undefined,
+                       afterPhotoFile: undefined,
+                     }
+                   : c,
+             );
+           }
+           pendingAfterUploads.current.delete(checkId);
+           return {
+             ...r,
+             checklistData: { ...r.checklistData, items: updatedItems },
+           };
+         }
+         return r;
+       });
+     });
+   }
 
   if (!appUser) return null;
 
