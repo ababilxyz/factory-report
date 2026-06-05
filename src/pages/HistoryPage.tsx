@@ -132,18 +132,18 @@ export default function HistoryPage() {
       const url = URL.createObjectURL(file);
 
       // Store in pending uploads with existing description if any
-      const existingCheck = reports
+      const existingDescription = reports
         .find((r) => r.reportId === reportId)
-        ?.checklistData?.items[itemId]?.checks.find((c) => c.id === checkId);
+        ?.checklistData?.items[itemId]?.checks.find((c) => c.id === checkId)?.afterDescription || "";
       
       pendingAfterUploads.current.set(checkId, {
         photoFile: file,
-        description: existingCheck?.afterDescription || "",
+        description: existingDescription,
       });
 
-      // Update local state to show preview
-      setReports((prev) =>
-        prev.map((report) => {
+      // Update local state to show preview - use functional update to ensure we get latest state
+      setReports((prev) => {
+        return prev.map((report) => {
           if (report.reportId === reportId && report.checklistData) {
             const updatedItems = { ...report.checklistData.items };
             if (updatedItems[itemId]) {
@@ -151,9 +151,12 @@ export default function HistoryPage() {
                 (c) => c.id === checkId,
               );
               if (checkIndex !== -1) {
+                // Preserve existing afterDescription and add preview
+                const existingDesc = updatedItems[itemId].checks[checkIndex].afterDescription || existingDescription;
                 updatedItems[itemId].checks[checkIndex] = {
                   ...updatedItems[itemId].checks[checkIndex],
                   afterPhotoPreview: url,
+                  afterDescription: existingDesc,
                 };
               }
             }
@@ -163,8 +166,8 @@ export default function HistoryPage() {
             };
           }
           return report;
-        }),
-      );
+        });
+      });
     } catch (err) {
       if (err instanceof Error && err.message !== "Camera cancelled") {
         setError("Could not access camera: " + err.message);
