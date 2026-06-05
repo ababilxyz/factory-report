@@ -80,14 +80,15 @@ export default function AdminDashboard() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [filter, setFilter] = useState<ReportStatus | "all">("all")
+  const [areaFilter, setAreaFilter] = useState<string | "all">("all")
   const [selectedReport, setSelectedReport] = useState<Report | null>(null)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
 
-  // Daily reset state: track the "base" date of the current reporting window
-  // Defaults to today; used to determine which items are "not reported"
+  // Daily reset state
   const todayStart = useMemo(() => getStartOfDay(Date.now()), [])
   const [resetDate, setResetDate] = useState<number>(todayStart)
 
-  // Sync resetDate with real midnight every minute
+  // Auto-update resetDate at midnight
   useEffect(() => {
     const interval = setInterval(() => {
       const newToday = getStartOfDay(Date.now())
@@ -166,25 +167,29 @@ export default function AdminDashboard() {
     return results
   }, [areas, itemsByArea, reports, resetDate])
 
+  const filtered =
+    filter === "all" ? reports : reports.filter((r) => r.status === filter)
+
+  const areaFiltered =
+    areaFilter === "all"
+      ? filtered
+      : filtered.filter((r) => r.areaId === areaFilter)
+
   // Group reports by date for the "date separated" list view
   const reportsByDate: Record<number, Report[]> = useMemo(() => {
     const map: Record<number, Report[]> = {}
-    // Use the filtered reports in display order (already sorted by timestamp DESC from DB)
-    const source = reports
+    const source = areaFiltered
     for (const report of source) {
       const dayKey = getStartOfDay(report.timestamp)
       if (!map[dayKey]) map[dayKey] = []
       map[dayKey].push(report)
     }
     return map
-  }, [reports])
+  }, [areaFiltered])
 
   const sortedDateKeys = Object.keys(reportsByDate)
     .map(Number)
     .sort((a, b) => b - a)
-
-  const filtered =
-    filter === "all" ? reports : reports.filter((r) => r.status === filter)
 
   const resetDateLabel = new Date(resetDate).toLocaleDateString("en-US", {
     weekday: "long",
@@ -250,14 +255,14 @@ export default function AdminDashboard() {
         {/* ================== Daily Summary Stat Cards ================== */}
         <section className="grid grid-cols-3 gap-3">
           {[
-            { label: "Today Reported", value: reports.length },
+            { label: "Today Reported", value: areaFiltered.length },
             {
               label: "Pending",
-              value: reports.filter((r) => r.status === "pending").length,
+              value: areaFiltered.filter((r) => r.status === "pending").length,
             },
             {
               label: "Resolved",
-              value: reports.filter((r) => r.status === "resolved").length,
+              value: areaFiltered.filter((r) => r.status === "resolved").length,
             },
           ].map((stat) => (
             <div
@@ -273,86 +278,126 @@ export default function AdminDashboard() {
         </section>
 
         {/* ================== Not Reported Today ================== */}
-        <section className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
-          <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">
-              Not reported today ({notReportedToday.length})
-            </h2>
-          </div>
+        {(() => {
+          const candidates =
+            areaFilter === "all"
+              ? notReportedToday
+              : notReportedToday.filter((e) => e.area.areaId === areaFilter)
 
-          {isLoading ? (
-            <div className="flex justify-center py-8">
-              <div className="w-7 h-7 rounded-full border-2 border-white/10 border-t-[#0d9488] animate-spin" />
-            </div>
-          ) : notReportedToday.length === 0 ? (
-            <div className="px-4 py-6 text-center text-sm text-slate-400">
-              All zones and items have been reported today.
-            </div>
-          ) : (
-            <div className="divide-y divide-white/5 max-h-[320px] overflow-y-auto">
-              {(() => {
-                const grouped: Record<string, { area: Area; item: Item }[]> = {}
-                for (const entry of notReportedToday) {
-                  if (!grouped[entry.area.areaId]) grouped[entry.area.areaId] = []
-                  grouped[entry.area.areaId].push(entry)
-                }
-                return Object.values(grouped).map((group) => {
-                  const area = group[0].area
-                  return (
-                    <div key={area.areaId}>
-                      <div className="px-4 py-2 bg-white/[0.02] border-b border-white/5">
-                        <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
-                          {area.name}
-                        </p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          {group.length} item{group.length > 1 ? "s" : ""} unreported
-                        </p>
-                      </div>
-                      <div className="divide-y divide-white/5">
-                        {group.map(({ item }) => (
-                          <div
-                            key={item.id}
-                            className="px-4 py-2.5 flex items-center justify-between gap-2"
-                          >
-                            <div className="min-w-0">
-                              <p className="text-sm text-slate-200 truncate">
-                                {item.name}
-                              </p>
-                              <p className="text-[11px] text-slate-500 mt-0.5">
-                                {item.code}
-                              </p>
+          const grouped: Record<string, { area: Area; item: Item }[]> = {}
+          for (const entry of candidates) {
+            if (!grouped[entry.area.areaId]) grouped[entry.area.areaId] = []
+            grouped[entry.area.areaId].push(entry)
+          }
+
+          return (
+            <section className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+                <h2 className="text-sm font-semibold">
+                  Not reported today ({candidates.length})
+                </h2>
+              </div>
+
+              {isLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-7 h-7 rounded-full border-2 border-white/10 border-t-[#0d9488] animate-spin" />
+                </div>
+              ) : candidates.length === 0 ? (
+                <div className="px-4 py-6 text-center text-sm text-slate-400">
+                  {areaFilter === "all"
+                    ? "All zones and items have been reported today."
+                    : `All items in this zone have been reported today.`}
+                </div>
+              ) : (
+                <div className="divide-y divide-white/5 max-h-[320px] overflow-y-auto">
+                  {Object.values(grouped).map((group) => {
+                    const area = group[0].area
+                    return (
+                      <div key={area.areaId}>
+                        <div className="px-4 py-2 bg-white/[0.02] border-b border-white/5">
+                          <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
+                            {area.name}
+                          </p>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            {group.length} item{group.length > 1 ? "s" : ""} unreported
+                          </p>
+                        </div>
+                        <div className="divide-y divide-white/5">
+                          {group.map(({ item }) => (
+                            <div
+                              key={item.id}
+                              className="px-4 py-2.5 flex items-center justify-between gap-2"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm text-slate-200 truncate">
+                                  {item.name}
+                                </p>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                  {item.code}
+                                </p>
+                              </div>
+                              <span className="text-[11px] px-2 py-0.5 rounded-full border border-red-800 bg-red-900/30 text-red-300 whitespace-nowrap">
+                                Not reported
+                              </span>
                             </div>
-                            <span className="text-[11px] px-2 py-0.5 rounded-full border border-red-800 bg-red-900/30 text-red-300 whitespace-nowrap">
-                              Not reported
-                            </span>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )
-                })
-              })()}
-            </div>
-          )}
-        </section>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
+          )
+        })()}
 
-        {/* ================== Status Filters ================== */}
-        <section className="flex gap-2">
-          {(["all", "pending", "in_progress", "resolved"] as const).map(
-            (f) => (
+        {/* ================== Zone Filter + Status Filters ================== */}
+        <section className="space-y-2">
+          {/* Zone filter chips */}
+          <section className="flex gap-2 overflow-x-auto pb-1">
+            <button
+              onClick={() => setAreaFilter("all")}
+              className={`px-3 py-1.5 text-sm rounded-full border whitespace-nowrap transition-colors ${
+                areaFilter === "all"
+                  ? "bg-[#0d9488] text-white border-[#0d9488]"
+                  : "border-white/10 text-slate-300 hover:border-white/20"
+              }`}
+            >
+              Semua Area
+            </button>
+            {areas.map((area) => (
               <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
-                  filter === f
+                key={area.areaId}
+                onClick={() => setAreaFilter(area.areaId)}
+                className={`px-3 py-1.5 text-sm rounded-full border whitespace-nowrap transition-colors ${
+                  areaFilter === area.areaId
                     ? "bg-[#0d9488] text-white border-[#0d9488]"
                     : "border-white/10 text-slate-300 hover:border-white/20"
                 }`}
               >
-                {f === "all" ? "All" : getStatusLabel(f)}
+                {area.name}
               </button>
-            )
-          )}
+            ))}
+          </section>
+
+          {/* Status filter chips */}
+          <section className="flex gap-2">
+            {(["all", "pending", "in_progress", "resolved"] as const).map(
+              (f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`px-3 py-1.5 text-sm rounded-full border whitespace-nowrap transition-colors ${
+                    filter === f
+                      ? "bg-[#0d9488] text-white border-[#0d9488]"
+                      : "border-white/10 text-slate-300 hover:border-white/20"
+                  }`}
+                >
+                  {f === "all" ? "Semua Status" : getStatusLabel(f)}
+                </button>
+              )
+            )}
+          </section>
         </section>
 
         {/* ================== Report List (date separated) ================== */}
@@ -360,7 +405,7 @@ export default function AdminDashboard() {
           <div className="flex justify-center py-16">
             <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-[#0d9488] animate-spin" />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : areaFiltered.length === 0 ? (
           <div className="text-center py-16 text-slate-400">
             <div className="w-10 h-10 rounded-full bg-white/5 mx-auto mb-3" />
             <p className="text-sm">No reports found</p>
@@ -430,7 +475,11 @@ export default function AdminDashboard() {
                               <img
                                 src={issuePhoto}
                                 alt="issue"
-                                className="w-14 h-14 rounded-lg object-cover bg-white/5"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setPreviewImage(issuePhoto)
+                                }}
+                                className="w-14 h-14 rounded-lg object-cover bg-white/5 cursor-pointer"
                               />
                             )}
                             <div className="flex-1 min-w-0">
@@ -610,7 +659,11 @@ export default function AdminDashboard() {
                                       <img
                                         src={check.issuePhotoUrl}
                                         alt="Issue"
-                                        className="max-h-40 rounded border border-red-900/50 mt-1"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setPreviewImage(check.issuePhotoUrl)
+                                        }}
+                                        className="max-h-40 rounded border border-red-900/50 mt-1 cursor-pointer"
                                       />
                                     )}
                                     {check.afterDescription && (
@@ -627,7 +680,11 @@ export default function AdminDashboard() {
                                       <img
                                         src={check.afterPhotoUrl}
                                         alt="After"
-                                        className="max-h-40 rounded border border-emerald-900/50 mt-1"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setPreviewImage(check.afterPhotoUrl)
+                                        }}
+                                        className="max-h-40 rounded border border-emerald-900/50 mt-1 cursor-pointer"
                                       />
                                     )}
                                   </div>
@@ -716,6 +773,56 @@ export default function AdminDashboard() {
                   )}
                 </div>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Image preview modal */}
+      <AnimatePresence>
+        {previewImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setPreviewImage(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-lg relative"
+            >
+              <button
+                type="button"
+                                onClick={async () => {
+                                  if (!previewImage) return
+                                  try {
+                                    const response = await fetch(previewImage)
+                                    const blob = await response.blob()
+                                    const url = URL.createObjectURL(blob)
+                                    const link = document.createElement('a')
+                                    link.href = url
+                                    link.download = 'photo.jpg'
+                                    document.body.appendChild(link)
+                                    link.click()
+                                    document.body.removeChild(link)
+                                    URL.revokeObjectURL(url)
+                                  } catch (error) {
+                                    console.error('Failed to download image', error)
+                                  }
+                                }}
+                className="absolute top-3 right-3 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs backdrop-blur-sm border border-white/10"
+              >
+                Download
+              </button>
+              <img
+                src={previewImage}
+                alt="Preview"
+                className="w-full rounded-xl border border-white/10"
+              />
             </motion.div>
           </motion.div>
         )}
