@@ -54,7 +54,6 @@ export interface CheckItem {
     afterPhotoUrl?: string  // Photo showing the fix/cleanup
     afterPhotoFile?: File  // After photo file for upload (transient)
     afterPhotoPreview?: string  // After photo preview URL (transient)
-    afterDescription?: string  // Description of what was done to fix
 }
 
 export interface Item {
