@@ -199,7 +199,7 @@ export default function AdminDashboard() {
   })
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100">
+    <div className="min-h-screen bg-[#0f172a] text-slate-100 overflow-x-hidden">
       {/* ================== Header ================== */}
       <header className="border-b border-white/10 bg-[#0f172a]/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -243,7 +243,7 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-5 space-y-5">
+      <main className="w-full max-w-3xl mx-auto px-4 py-5 space-y-5">
         {/* ================== Date / Reset Banner ================== */}
         <section className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
           <p className="text-xs text-slate-400 uppercase tracking-wide">
@@ -381,7 +381,7 @@ export default function AdminDashboard() {
           </section>
 
           {/* Status filter chips */}
-          <section className="flex gap-2">
+          <section className="flex gap-2 overflow-x-auto pb-1">
             {(["all", "pending", "in_progress", "resolved"] as const).map(
               (f) => (
                 <button
