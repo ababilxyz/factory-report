@@ -43,8 +43,8 @@ export function useQrScanner() {
       scannerRef.current = scanner
 
       await scanner.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 280, height: 280 } },
+        { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        { fps: 15, qrbox: { width: 350, height: 350 } },
         async (decodedText) => {
           if (isProcessingRef.current) return
           isProcessingRef.current = true
