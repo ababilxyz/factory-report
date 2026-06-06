@@ -72,6 +72,9 @@ deploy-log.txt
 # Build output
 dist/
 
+# QR generation script (contains crypto operations)
+scripts/generate-qr.mjs
+
 # dataconnect generated files
 .dataconnect
 

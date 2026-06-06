@@ -60,7 +60,7 @@ export default function ScannerPage() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
+            className="absolute inset-0 flex flex-col items-center justify-start pt-24 pointer-events-none"
           >
             <div className="relative w-72 h-72">
               <svg className="absolute inset-0 w-full h-full" viewBox="0 0 288 288" fill="none" xmlns="http://www.w3.org/2000/svg">
