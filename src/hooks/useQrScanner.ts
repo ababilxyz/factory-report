@@ -60,7 +60,7 @@ export function useQrScanner() {
         setError({ code: 'PERMISSION_DENIED', message: 'Camera permission denied. Please allow camera access in your browser settings.' })
         setScanState('error')
       } else {
-        setError({ code: 'CAMERA_ERROR', message: 'Could not start camera: ' + err.message })
+        setError({ code: 'CAMERA_ERROR', message: 'Could not start camera: ' + (err instanceof Error ? err.message : String(err)) })
         setScanState('error')
       }
     } finally {
