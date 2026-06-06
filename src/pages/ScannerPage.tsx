@@ -60,9 +60,9 @@ export default function ScannerPage() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="absolute inset-0 flex flex-col items-center justify-center pt-20 pointer-events-none"
+            className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
           >
-            <div className="relative w-72 h-72">
+            <div className="relative w-72 h-72 -mt-20">
               <svg className="absolute inset-0 w-full h-full" viewBox="0 0 288 288" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M0 40V8C0 3.58172 3.58172 0 8 0H40" stroke="white" strokeWidth="3" strokeLinecap="round"/>
                 <path d="M248 0H280C284.418 0 288 3.58172 288 8V40" stroke="white" strokeWidth="3" strokeLinecap="round"/>
