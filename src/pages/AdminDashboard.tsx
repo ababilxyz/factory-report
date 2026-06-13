@@ -9,7 +9,7 @@ import {
   getAllAreas,
   getItemsByAreaId,
   getWeeklyItemsByAreaId,
-  getWeeklyReportsByWorkerId,
+  getWeeklyReports,
 } from "../lib/supabaseDb"
 import type { Report, ReportStatus, Area, Item, ChecklistData } from "../types"
 import { motion, AnimatePresence } from "framer-motion"
@@ -186,12 +186,12 @@ export default function AdminDashboard() {
   const unreportedItems = useMemo(() => {
     if (reportMode === "daily") {
       const dayEnd = resetDate + 86_400_000
-      const todayReports = reports.filter((r) => r.timestamp >= resetDate && r.timestamp < dayEnd)
+      const todayReports = reports.filter((r: Report) => r.timestamp >= resetDate && r.timestamp < dayEnd)
       const results: { area: Area; item: Item }[] = []
       for (const area of areas) {
         const items = itemsByArea[area.areaId] || []
         for (const item of items) {
-          const wasReported = todayReports.some((r) => {
+          const wasReported = todayReports.some((r: Report) => {
             const checklist = r.checklistData as ChecklistData | undefined
             if (!checklist?.items) return false
             return Object.values(checklist.items).some(
@@ -206,7 +206,7 @@ export default function AdminDashboard() {
       return results
     }
 
-    const weeklyReports = (reports as Report[]).filter((r) => r.timestamp >= activeWeekStart && r.timestamp < weekEnd)
+    const weeklyReports = (reports as Report[]).filter((r: Report) => r.timestamp >= activeWeekStart && r.timestamp < weekEnd)
     const results: { area: Area; item: Item }[] = []
     for (const area of areas) {
       const items = itemsByArea[area.areaId] || []
