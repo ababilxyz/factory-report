@@ -8,6 +8,9 @@ import {
   getUserProfile,
   getAllAreas,
   getItemsByAreaId,
+  getWeeklyItemsByAreaId,
+  getWeeklyChecksByItemId,
+  getWeeklyReportsByWorkerId,
 } from "../lib/supabaseDb"
 import type { Report, ReportStatus, Area, Item, ChecklistData } from "../types"
 import { motion, AnimatePresence } from "framer-motion"
@@ -79,6 +82,7 @@ export default function AdminDashboard() {
   const { appUser, signOut } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [reportMode, setReportMode] = useState<"daily" | "weekly">("daily")
   const [filter, setFilter] = useState<ReportStatus | "all">("all")
   const [areaFilter, setAreaFilter] = useState<string | "all">("all")
   const [selectedReport, setSelectedReport] = useState<Report | null>(null)
@@ -87,6 +91,17 @@ export default function AdminDashboard() {
   // Daily reset state
   const todayStart = useMemo(() => getStartOfDay(Date.now()), [])
   const [resetDate, setResetDate] = useState<number>(todayStart)
+
+  // Weekly window state (defaults to current week)
+  const weekStart = useMemo(() => {
+    const d = new Date()
+    const day = d.getDay()
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+    return new Date(d.setDate(diff)).setHours(0, 0, 0, 0)
+  }, [])
+  const [weekStartOverride, setWeekStartOverride] = useState<number | null>(null)
+  const activeWeekStart = weekStartOverride ?? weekStart
+  const weekEnd = activeWeekStart + 86_400_000 * 7
 
   // Auto-update resetDate at midnight
   useEffect(() => {
@@ -107,8 +122,13 @@ export default function AdminDashboard() {
   const workerDisplayName = selectedReport?.workerName || resolvedWorker?.displayName || null
 
   const { data: reports = [], isLoading } = useQuery({
-    queryKey: ["reports", filter],
-    queryFn: () => (filter === "all" ? getReports(undefined) : getReports(filter)),
+    queryKey: ["reports", filter, reportMode],
+    queryFn: () =>
+      reportMode === "weekly"
+        ? getWeeklyReportsByWorkerId(appUser!.uid, activeWeekStart)
+        : filter === "all"
+          ? getReports(undefined)
+          : getReports(filter),
   })
 
   const { data: areas = [] } = useQuery({
@@ -116,7 +136,7 @@ export default function AdminDashboard() {
     queryFn: getAllAreas,
   })
 
-  const { data: itemsByArea = {} } = useQuery({
+  const { data: dailyItemsByArea = {} } = useQuery({
     queryKey: ["itemsByArea"],
     queryFn: async () => {
       const map: Record<string, Item[]> = {}
@@ -127,8 +147,26 @@ export default function AdminDashboard() {
       )
       return map
     },
-    enabled: areas.length > 0,
+    enabled: areas.length > 0 && reportMode === "daily",
   })
+
+  const { data: weeklyItemsByArea = {} } = useQuery({
+    queryKey: ["weeklyItemsByArea"],
+    queryFn: async () => {
+      const map: Record<string, Item[]> = {}
+      await Promise.all(
+        areas.map(async (area) => {
+          const items = await getWeeklyItemsByAreaId(area.areaId)
+          map[area.areaId] = items
+        })
+      )
+      return map
+    },
+    enabled: areas.length > 0 && reportMode === "weekly",
+  })
+
+  const itemsByArea =
+    reportMode === "weekly" ? weeklyItemsByArea : dailyItemsByArea
 
   const mutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: ReportStatus }) =>
@@ -142,21 +180,40 @@ export default function AdminDashboard() {
     },
   })
 
-  // Compute "not reported" items for the current resetDate window
-  const notReportedToday = useMemo(() => {
-    const dayEnd = resetDate + 86_400_000
-    // Only keep reports within the current resetDate window
-    const todayReports = reports.filter((r) => r.timestamp >= resetDate && r.timestamp < dayEnd)
+  // Compute "not reported" items for the current window
+  const unreportedItems = useMemo(() => {
+    if (reportMode === "daily") {
+      const dayEnd = resetDate + 86_400_000
+      const todayReports = reports.filter((r) => r.timestamp >= resetDate && r.timestamp < dayEnd)
+      const results: { area: Area; item: Item }[] = []
+      for (const area of areas) {
+        const items = itemsByArea[area.areaId] || []
+        for (const item of items) {
+          const wasReported = todayReports.some((r) => {
+            const checklist = r.checklistData as ChecklistData | undefined
+            if (!checklist?.items) return false
+            return Object.values(checklist.items).some(
+              (i: any) => (i as any).id === item.id || i.code === item.code
+            )
+          })
+          if (!wasReported) {
+            results.push({ area, item })
+          }
+        }
+      }
+      return results
+    }
 
+    const weeklyReports = (reports as Report[]).filter((r) => r.timestamp >= activeWeekStart && r.timestamp < weekEnd)
     const results: { area: Area; item: Item }[] = []
     for (const area of areas) {
       const items = itemsByArea[area.areaId] || []
       for (const item of items) {
-        const wasReported = todayReports.some((r) => {
+        const wasReported = weeklyReports.some((r) => {
           const checklist = r.checklistData as ChecklistData | undefined
           if (!checklist?.items) return false
           return Object.values(checklist.items).some(
-            (i) => (i as any).id === item.id || i.code === item.code
+            (i: any) => (i as any).id === item.id || i.code === item.code
           )
         })
         if (!wasReported) {
@@ -165,7 +222,7 @@ export default function AdminDashboard() {
       }
     }
     return results
-  }, [areas, itemsByArea, reports, resetDate])
+  }, [reportMode, areas, itemsByArea, reports, resetDate, activeWeekStart, weekEnd])
 
   const filtered =
     filter === "all" ? reports : reports.filter((r) => r.status === filter)
@@ -180,12 +237,18 @@ export default function AdminDashboard() {
     const map: Record<number, Report[]> = {}
     const source = areaFiltered
     for (const report of source) {
+      if (reportMode === "weekly" && (report as any).reportType === "weekly" && (report as any).weekStart) {
+        const dayKey = (report as any).weekStart
+        if (!map[dayKey]) map[dayKey] = []
+        map[dayKey].push(report)
+        continue
+      }
       const dayKey = getStartOfDay(report.timestamp)
       if (!map[dayKey]) map[dayKey] = []
       map[dayKey].push(report)
     }
     return map
-  }, [areaFiltered])
+  }, [areaFiltered, reportMode])
 
   const sortedDateKeys = Object.keys(reportsByDate)
     .map(Number)
@@ -244,18 +307,62 @@ export default function AdminDashboard() {
       </header>
 
       <main className="w-full max-w-3xl mx-auto px-4 py-5 space-y-5">
-        {/* ================== Date / Reset Banner ================== */}
-        <section className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-          <p className="text-xs text-slate-400 uppercase tracking-wide">
-            Reporting window
-          </p>
-          <p className="text-sm font-medium mt-0.5">{resetDateLabel}</p>
+        {/* ================== Report Mode + Date / Reset Banner ================== */}
+        <section className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-slate-400 uppercase tracking-wide">Reporting mode</p>
+            <div className="flex rounded-full border border-white/10 overflow-hidden">
+              <button
+                onClick={() => setReportMode("daily")}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  reportMode === "daily"
+                    ? "bg-[#0d9488] text-white"
+                    : "text-slate-300 hover:bg-white/5"
+                }`}
+              >
+                Daily
+              </button>
+              <button
+                onClick={() => setReportMode("weekly")}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  reportMode === "weekly"
+                    ? "bg-[#0d9488] text-white"
+                    : "text-slate-300 hover:bg-white/5"
+                }`}
+              >
+                Weekly
+              </button>
+            </div>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 uppercase tracking-wide">
+              {reportMode === "weekly" ? "Reporting week" : "Reporting window"}
+            </p>
+            {reportMode === "weekly" ? (
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  type="date"
+                  value={new Date(activeWeekStart).toISOString().slice(0, 10)}
+                  onChange={(e) => {
+                    const d = new Date(`${e.target.value}T00:00:00`)
+                    if (!Number.isNaN(d.getTime())) setWeekStartOverride(d.getTime())
+                  }}
+                  className="text-sm rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-slate-100"
+                />
+                <span className="text-xs text-slate-400">
+                  to {new Date(weekEnd - 1).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
+                </span>
+              </div>
+            ) : (
+              <p className="text-sm font-medium mt-0.5">{resetDateLabel}</p>
+            )}
+          </div>
         </section>
 
         {/* ================== Daily Summary Stat Cards ================== */}
         <section className="grid grid-cols-3 gap-3">
           {[
-            { label: "Today Reported", value: areaFiltered.length },
+            { label: reportMode === "weekly" ? "This Week" : "Today Reported", value: areaFiltered.length },
             {
               label: "Pending",
               value: areaFiltered.filter((r) => r.status === "pending").length,
@@ -280,9 +387,7 @@ export default function AdminDashboard() {
         {/* ================== Not Reported Today ================== */}
         {(() => {
           const candidates =
-            areaFilter === "all"
-              ? notReportedToday
-              : notReportedToday.filter((e) => e.area.areaId === areaFilter)
+            areaFilter === "all" ? unreportedItems : unreportedItems.filter((e) => e.area.areaId === areaFilter)
 
           const grouped: Record<string, { area: Area; item: Item }[]> = {}
           for (const entry of candidates) {
@@ -294,7 +399,9 @@ export default function AdminDashboard() {
             <section className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
               <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
                 <h2 className="text-sm font-semibold">
-                  Not reported today ({candidates.length})
+                  {reportMode === "weekly"
+                    ? `Not reported this week (${candidates.length})`
+                    : `Not reported today (${candidates.length})`}
                 </h2>
               </div>
 
@@ -305,8 +412,12 @@ export default function AdminDashboard() {
               ) : candidates.length === 0 ? (
                 <div className="px-4 py-6 text-center text-sm text-slate-400">
                   {areaFilter === "all"
-                    ? "All zones and items have been reported today."
-                    : `All items in this zone have been reported today.`}
+                    ? reportMode === "weekly"
+                      ? "All zones and items have been reported this week."
+                      : "All zones and items have been reported today."
+                    : reportMode === "weekly"
+                      ? "All items in this zone have been reported this week."
+                      : `All items in this zone have been reported today.`}
                 </div>
               ) : (
                 <div className="divide-y divide-white/5 max-h-[320px] overflow-y-auto">

@@ -2,13 +2,19 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { encryptQrPayload } from '../utils/encryption'
-import { getAllAreas, getItemsByAreaId } from '../lib/supabaseDb'
+import {
+  getAllAreas,
+  getItemsByAreaId,
+  getWeeklyItemsByAreaId,
+  getWeeklyChecksByItemId,
+} from '../lib/supabaseDb'
 import { useQuery } from '@tanstack/react-query'
-import type { Area, Item } from '../types'
+import type { Area, Item, ReportType } from '../types'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export default function QrGeneratorPage() {
   const navigate = useNavigate()
+  const [reportMode, setReportMode] = useState<ReportType>('daily')
   const [selectedArea, setSelectedArea] = useState<Area | null>(null)
   const [selectedItem, setSelectedItem] = useState<Item | null>(null)
   const [generatedPayload, setGeneratedPayload] = useState<string | null>(null)
@@ -16,16 +22,24 @@ export default function QrGeneratorPage() {
   const { data: areas = [], isLoading: areasLoading } = useQuery({
     queryKey: ['areas'],
     queryFn: getAllAreas,
+    select: (data) => [...data].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)),
   })
 
   const { data: items = [], isLoading: itemsLoading } = useQuery({
-    queryKey: ['items', selectedArea?.areaId],
-    queryFn: () => (selectedArea ? getItemsByAreaId(selectedArea.areaId) : Promise.resolve([])),
+    queryKey: ['items', selectedArea?.areaId, reportMode],
+    queryFn: () => {
+      if (!selectedArea) return Promise.resolve([])
+      return reportMode === 'weekly'
+        ? getWeeklyItemsByAreaId(selectedArea.areaId)
+        : getItemsByAreaId(selectedArea.areaId)
+    },
     enabled: !!selectedArea,
   })
 
   function generateQr(item: Item, area: Area) {
-    const encrypted = encryptQrPayload(item.id)
+    // Use actual item id for daily, or weekly item id for weekly
+    const targetItemId = item.id
+    const encrypted = encryptQrPayload(targetItemId)
     setSelectedItem(item)
     setSelectedArea(area)
     setGeneratedPayload(encrypted)
@@ -50,6 +64,40 @@ export default function QrGeneratorPage() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-5 space-y-4">
+        <section className="flex items-center justify-between">
+          <h2 className="text-sm text-slate-400">Report type</h2>
+          <div className="flex rounded-full border border-white/10 overflow-hidden">
+            <button
+              onClick={() => {
+                setReportMode('daily')
+                setSelectedItem(null)
+                setGeneratedPayload(null)
+              }}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                reportMode === 'daily'
+                  ? 'bg-[#0d9488] text-white'
+                  : 'text-slate-300 hover:bg-white/5'
+              }`}
+            >
+              Daily
+            </button>
+            <button
+              onClick={() => {
+                setReportMode('weekly')
+                setSelectedItem(null)
+                setGeneratedPayload(null)
+              }}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                reportMode === 'weekly'
+                  ? 'bg-[#0d9488] text-white'
+                  : 'text-slate-300 hover:bg-white/5'
+              }`}
+            >
+              Weekly
+            </button>
+          </div>
+        </section>
+
         {!selectedItem && (
           <section className="space-y-3">
             <h2 className="text-sm text-slate-400">Select area</h2>
@@ -82,13 +130,21 @@ export default function QrGeneratorPage() {
 
         {selectedArea && !selectedItem && (
           <section className="space-y-3">
-            <h2 className="text-sm text-slate-400">Items in {selectedArea.name}</h2>
+            <h2 className="text-sm text-slate-400">
+              {reportMode === 'weekly'
+                ? `Weekly items in ${selectedArea.name}`
+                : `Items in ${selectedArea.name}`}
+            </h2>
             {itemsLoading ? (
               <div className="flex justify-center py-12">
                 <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-[#0d9488] animate-spin" />
               </div>
             ) : items.length === 0 ? (
-              <p className="text-sm text-slate-500">No items in this area.</p>
+              <p className="text-sm text-slate-500">
+                {reportMode === 'weekly'
+                  ? 'No weekly items in this area.'
+                  : 'No items in this area.'}
+              </p>
             ) : (
               <div className="space-y-2">
                 {items.map((item) => (
@@ -97,8 +153,17 @@ export default function QrGeneratorPage() {
                     onClick={() => generateQr(item, selectedArea)}
                     className="w-full text-left rounded-xl border border-white/10 bg-white/5 px-4 py-3 hover:border-[#0d9488]/60 transition-colors"
                   >
-                    <p className="text-sm font-medium">{item.name}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{item.code}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-medium">{item.name}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{item.code}</p>
+                      </div>
+                      {reportMode === 'weekly' && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full border border-white/10 text-slate-200">
+                          Weekly
+                        </span>
+                      )}
+                    </div>
                   </button>
                 ))}
               </div>

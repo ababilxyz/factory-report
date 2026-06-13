@@ -17,20 +17,11 @@ export interface AppUser {
 export interface Area {
   areaId: string
   name: string
-  encryptedQrPayload: string | null  // Items have QR payloads now
-  allowedLat: number
-  allowedLng: number
-  radiusMeters: number
-}
-
-export interface AreaWithItems {
-  areaId: string
-  name: string
   encryptedQrPayload: string | null
   allowedLat: number
   allowedLng: number
   radiusMeters: number
-  items: Item[]
+  displayOrder?: number
 }
 
 // ==================
@@ -47,34 +38,26 @@ export interface QrPayload {
 // Report Types
 // ==================
 export type ReportStatus = 'pending' | 'in_progress' | 'resolved'
+export type ReportType = 'daily' | 'weekly'
 
 export interface CheckItem {
-    id: string  // Format: "label(code)" e.g., "identitas(D-1.01)"
+    id: string
     label: string
-    code: string  // Check-specific code suffix
-    options: string[]  // Dynamic options like "Baik", "Rusak", "Sesuai", "Tidak Sesuai"
-    selectedOption?: string  // The selected option label
-    order?: number  // Display order
-    // Before/Issue evidence (for negative/neutral)
-    issuePhotoUrl?: string  // Photo for issue (negative/neutral option)
-    issueDescription?: string  // Description for issue
-    issuePhotoFile?: File  // Photo file for upload (transient)
-    issuePhotoPreview?: string  // Photo preview URL (transient)
-    // After/Fix evidence (for after the issue is fixed)
-    afterPhotoUrl?: string  // Photo showing the fix/cleanup
-    afterPhotoFile?: File  // After photo file for upload (transient)
-    afterPhotoPreview?: string  // After photo preview URL (transient)
-    afterDescription?: string  // Description of action taken to fix the issue
+    code: string
+    options: string[]
+    selectedOption?: string
+    order?: number
 }
 
 export interface Item {
-    id: string  // Format: "itemid" e.g., "item-1"
+    id: string
     areaId?: string
     code: string
     name: string
     order: number
     checks: CheckItem[]
-    examplePhotoUrl?: string  // Optional example photo URL for reference
+    examplePhotoUrl?: string
+    reportType?: ReportType
 }
 
 export interface AreaItems {
@@ -95,6 +78,9 @@ export interface Report {
     areaName?: string
     workerUid: string
     workerName?: string
+    beforePhotoUrl?: string
+    afterPhotoUrl?: string
+    description: string
     status: ReportStatus
     gpsLat?: number
     gpsLng?: number
@@ -106,6 +92,9 @@ export interface Report {
 
 export interface CreateReportInput {
     areaId: string
+    beforePhotoFile?: File
+    afterPhotoFile?: File
+    description: string
     gpsLat?: number
     gpsLng?: number
     sessionId: string
