@@ -122,12 +122,15 @@ export default function AdminDashboard() {
 
   const { data: reports = [], isLoading } = useQuery({
     queryKey: ["reports", filter, reportMode],
-    queryFn: () =>
-      reportMode === "weekly"
-        ? getWeeklyReportsByWorkerId(appUser!.uid, activeWeekStart)
-        : filter === "all"
-          ? getReports(undefined)
-          : getReports(filter),
+    queryFn: async () => {
+      if (reportMode === "weekly") {
+        return getWeeklyReports(activeWeekStart)
+      }
+      if (filter === "all") {
+        return getReports(undefined, undefined, "daily")
+      }
+      return getReports(filter, undefined, "daily")
+    },
   })
 
   const { data: areas = [] } = useQuery({

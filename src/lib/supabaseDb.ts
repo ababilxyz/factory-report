@@ -224,7 +224,8 @@ export async function createReport(
 
 export async function getReports(
   statusFilter?: ReportStatus,
-  limitCount = 50
+  limitCount = 50,
+  reportType?: ReportType
 ): Promise<Report[]> {
   let query = supabase
     .from('reports')
@@ -234,6 +235,36 @@ export async function getReports(
 
   if (statusFilter) {
     query = query.eq('status', statusFilter)
+  }
+
+  if (reportType) {
+    query = query.eq('report_type', reportType)
+  }
+
+  const { data, error } = await query
+
+  if (error) throw error
+  return (data || []).map((d: any) => ({
+    reportId: d.report_id,
+    areaId: d.area_id,
+    areaName: d.area_name,
+    workerUid: d.worker_uid,
+    workerName: d.worker_name,
+    beforePhotoUrl: d.before_photo_url,
+    afterPhotoUrl: d.after_photo_url,
+    description: d.description,
+    status: d.status,
+    gpsLat: d.gps_lat,
+    gpsLng: d.gps_lng,
+    timestamp: d.timestamp,
+    deviceId: d.device_id,
+    sessionId: d.session_id,
+    checklistData: d.checklist_data
+  })) as Report[]
+}
+
+  if (reportType) {
+    query = query.eq('report_type', reportType)
   }
 
   const { data, error } = await query
