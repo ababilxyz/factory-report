@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { decryptQrPayload, DecryptionError } from '../utils/encryption'
 import { getCurrentPosition, haversineDistance } from '../utils/geolocation'
-import { getItem, getArea } from '../lib/supabaseDb'
+import { getItem, getWeeklyItem, getArea } from '../lib/supabaseDb'
 import type { ScanState, ScanResult, ScanError } from '../types'
 
 const SCANNER_ELEMENT_ID = 'qr-reader'
@@ -84,11 +84,22 @@ export function useQrScanner() {
         throw { code: 'DECRYPT_FAILED', message: 'Invalid QR code.' }
       }
 
-      // Step 2: Load item from database
+      // Step 2: Load item from database (try daily, then weekly)
       setStatusMessage('Loading item data...')
-      const item = await getItem(payload.areaId)
+      console.log('[QR Scanner] Looking up itemId:', payload.areaId)
+      let item = await getItem(payload.areaId)
+      let reportType: 'daily' | 'weekly' = 'daily'
       if (!item) {
-        throw { code: 'AREA_NOT_FOUND', message: 'Item not found in the system. Contact your supervisor.' }
+        console.log('[QR Scanner] Not found in daily items, trying weekly_items...')
+        item = await getWeeklyItem(payload.areaId)
+        reportType = 'weekly'
+        console.log('[QR Scanner] weekly_items result:', item)
+      } else {
+        console.log('[QR Scanner] Found in daily items:', item)
+      }
+      if (!item) {
+        console.error('[QR Scanner] Item NOT found in either table:', payload.areaId)
+        throw { code: 'AREA_NOT_FOUND', message: `Item "${payload.areaId}" not found in the system. Contact your supervisor.` }
       }
 
       // Step 3: Get area for GPS validation
@@ -130,7 +141,8 @@ export function useQrScanner() {
         sessionId: payload.nonce,
         gpsLat: coords.lat,
         gpsLng: coords.lng,
-        examplePhotoUrl: item.examplePhotoUrl
+        examplePhotoUrl: item.examplePhotoUrl,
+        reportType
       })
 
     } catch (e: unknown) {
