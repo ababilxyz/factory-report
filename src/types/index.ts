@@ -127,6 +127,7 @@ export interface ScanResult {
   gpsLat: number
   gpsLng: number
   examplePhotoUrl?: string  // Optional example photo from scanned item
+  reportType?: 'daily' | 'weekly'
 }
 
 export interface ScanError {

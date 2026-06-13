@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { decryptQrPayload, DecryptionError } from '../utils/encryption'
 import { getCurrentPosition, haversineDistance } from '../utils/geolocation'
-import { getItem, getArea } from '../lib/supabaseDb'
+import { getItem, getArea, getWeeklyItem } from '../lib/supabaseDb'
 import type { ScanState, ScanResult, ScanError } from '../types'
 
 const SCANNER_ELEMENT_ID = 'qr-reader'
@@ -86,7 +86,16 @@ export function useQrScanner() {
 
       // Step 2: Load item from database
       setStatusMessage('Loading item data...')
-      const item = await getItem(payload.areaId)
+      let item = await getItem(payload.areaId)
+      let reportType: 'daily' | 'weekly' = 'daily'
+      if (!item) {
+        const weeklyItem = await getWeeklyItem(payload.areaId)
+        if (weeklyItem) {
+          item = weeklyItem
+          reportType = 'weekly'
+        }
+      }
+
       if (!item) {
         throw { code: 'AREA_NOT_FOUND', message: 'Item not found in the system. Contact your supervisor.' }
       }
@@ -130,7 +139,8 @@ export function useQrScanner() {
         sessionId: payload.nonce,
         gpsLat: coords.lat,
         gpsLng: coords.lng,
-        examplePhotoUrl: item.examplePhotoUrl
+        examplePhotoUrl: item.examplePhotoUrl,
+        reportType,
       })
 
     } catch (e: unknown) {
