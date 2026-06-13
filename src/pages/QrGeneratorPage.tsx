@@ -6,7 +6,6 @@ import {
   getAllAreas,
   getItemsByAreaId,
   getWeeklyItemsByAreaId,
-  getWeeklyChecksByItemId,
 } from '../lib/supabaseDb'
 import { useQuery } from '@tanstack/react-query'
 import type { Area, Item, ReportType } from '../types'

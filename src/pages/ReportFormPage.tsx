@@ -637,6 +637,7 @@ export default function ReportFormPage() {
       await createReport(
         {
           areaId: scanResult.areaId,
+          description: checklistData.hasIssues ? 'Report with issues' : 'Routine report',
           gpsLat: scanResult.gpsLat,
           gpsLng: scanResult.gpsLng,
           sessionId: scanResult.sessionId,

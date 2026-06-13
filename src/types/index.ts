@@ -47,6 +47,14 @@ export interface CheckItem {
     options: string[]
     selectedOption?: string
     order?: number
+    issuePhotoPreview?: string
+    afterPhotoPreview?: string
+    issuePhotoFile?: File
+    afterPhotoFile?: File
+    issuePhotoUrl?: string
+    afterPhotoUrl?: string
+    issueDescription?: string
+    afterDescription?: string
 }
 
 export interface Item {

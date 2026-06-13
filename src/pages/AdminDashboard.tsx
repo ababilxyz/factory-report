@@ -9,7 +9,6 @@ import {
   getAllAreas,
   getItemsByAreaId,
   getWeeklyItemsByAreaId,
-  getWeeklyChecksByItemId,
   getWeeklyReportsByWorkerId,
 } from "../lib/supabaseDb"
 import type { Report, ReportStatus, Area, Item, ChecklistData } from "../types"
