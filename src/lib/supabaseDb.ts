@@ -224,8 +224,7 @@ export async function createReport(
 
 export async function getReports(
   statusFilter?: ReportStatus,
-  limitCount = 50,
-  reportType?: ReportType
+  limitCount = 50
 ): Promise<Report[]> {
   let query = supabase
     .from('reports')
@@ -235,10 +234,6 @@ export async function getReports(
 
   if (statusFilter) {
     query = query.eq('status', statusFilter)
-  }
-
-  if (reportType) {
-    query = query.eq('report_type', reportType)
   }
 
   const { data, error } = await query

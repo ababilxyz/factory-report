@@ -96,8 +96,6 @@ export interface Report {
     deviceId: string
     sessionId: string
     checklistData?: ChecklistData  // New field for structured checklist
-    reportType?: ReportType
-    weekStart?: number
 }
 
 export interface CreateReportInput {
