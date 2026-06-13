@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { createReport, createWeeklyReport, getChecksByItemId, getWeeklyChecksByItemId, getItem, getWeeklyItem } from "../lib/supabaseDb";
+import { createReport, getChecksByItemId, getItem } from "../lib/supabaseDb";
 import { openCameraCapture, compressImage } from "../utils/imageUtils";
 import { uploadImage } from "../lib/storage";
 import type { ScanResult, ChecklistData, Item, CheckItem } from "../types";
@@ -16,30 +16,23 @@ function generateCheckId(label: string, code: string, index: number): string {
 // Fetch checks from database for a specific item
 async function fetchChecklistFromDb(
   itemId: string,
-  reportType: 'daily' | 'weekly' = 'daily'
 ): Promise<ChecklistData | null> {
-  let item: Item | null
-  if (reportType === 'weekly') {
-    item = await getWeeklyItem(itemId);
-  } else {
-    item = await getItem(itemId);
-  }
+  // First get item data
+  const item = await getItem(itemId);
   if (!item) {
-    console.error("Item not found:", itemId, "type:", reportType);
+    console.error("Item not found:", itemId);
     return null;
   }
 
   // Then get checks
   const checks: CheckItem[] = [];
   try {
-    const itemChecks = reportType === 'weekly'
-      ? await getWeeklyChecksByItemId(itemId)
-      : await getChecksByItemId(itemId);
+    const itemChecks = await getChecksByItemId(itemId);
     checks.push(
       ...itemChecks.map((c, index) => ({
-        id: generateCheckId(c.checkLabel, item!.code, index),
+        id: generateCheckId(c.checkLabel, item.code, index),
         label: c.checkLabel,
-        code: item!.code,
+        code: item.code,
         options: c.checkOptions,
         order: c.displayOrder,
       })),
@@ -174,7 +167,7 @@ export default function ReportFormPage() {
   // Load checklist when scanResult changes
   useEffect(() => {
     if (scanResult) {
-      void fetchChecklistFromDb(scanResult.areaId, scanResult.reportType).then((data) => {
+      void fetchChecklistFromDb(scanResult.areaId).then((data) => {
         if (data) setChecklistData(data);
       });
     }
@@ -641,42 +634,17 @@ export default function ReportFormPage() {
         }
       }
 
-      const isWeekly = scanResult.reportType === 'weekly';
-      if (isWeekly) {
-        // Determine week start (start of current week, Monday)
-        const now = new Date();
-        const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ...
-        const monday = new Date(now);
-        monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
-        monday.setHours(0, 0, 0, 0);
-        const weekStart = monday.getTime();
-
-        await createWeeklyReport(
-          {
-            areaId: scanResult.areaId,
-            description: checklistData.hasIssues ? 'Report with issues' : 'Routine report',
-            gpsLat: scanResult.gpsLat,
-            gpsLng: scanResult.gpsLng,
-            sessionId: scanResult.sessionId,
-            checklistData: finalChecklist,
-            reportType: 'weekly',
-            weekStart,
-          },
-          appUser.uid,
-        );
-      } else {
-        await createReport(
-          {
-            areaId: scanResult.areaId,
-            description: checklistData.hasIssues ? 'Report with issues' : 'Routine report',
-            gpsLat: scanResult.gpsLat,
-            gpsLng: scanResult.gpsLng,
-            sessionId: scanResult.sessionId,
-            checklistData: finalChecklist,
-          },
-          appUser.uid,
-        );
-      }
+      await createReport(
+        {
+          areaId: scanResult.areaId,
+          description: checklistData.hasIssues ? 'Report with issues' : 'Routine report',
+          gpsLat: scanResult.gpsLat,
+          gpsLng: scanResult.gpsLng,
+          sessionId: scanResult.sessionId,
+          checklistData: finalChecklist,
+        },
+        appUser.uid,
+      );
       setSubmitted(true);
     } catch (err) {
       setSubmitError(
