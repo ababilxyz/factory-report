@@ -568,7 +568,8 @@ export default function ReportFormPage() {
       // Track uploaded URLs - separate maps for issue and after photos
       const uploadedIssueUrls = new Map<string, string>();
       const uploadedAfterUrls = new Map<string, string>();
-      const uploadedDescriptions = new Map<string, string>();
+      const uploadedIssueDescriptions = new Map<string, string>();
+      const uploadedAfterDescriptions = new Map<string, string>();
 
       // Upload all photos
       for (const evidence of evidenceToUpload) {
@@ -577,10 +578,11 @@ export default function ReportFormPage() {
 
         if (evidence.type === "issue") {
           uploadedIssueUrls.set(evidence.checkId, result.url);
+          uploadedIssueDescriptions.set(evidence.checkId, evidence.description);
         } else {
           uploadedAfterUrls.set(evidence.checkId, result.url);
+          uploadedAfterDescriptions.set(evidence.checkId, evidence.description);
         }
-        uploadedDescriptions.set(evidence.checkId, evidence.description);
 
         uploaded++;
         setUploadProgress(Math.round((uploaded / totalPending) * 100));
@@ -602,7 +604,7 @@ export default function ReportFormPage() {
             finalChecklist.items[itemId].checks[
               checkIndex
             ].issuePhotoPreview = undefined;
-            const desc = uploadedDescriptions.get(checkId);
+            const desc = uploadedIssueDescriptions.get(checkId);
             if (desc) {
               finalChecklist.items[itemId].checks[
                 checkIndex
@@ -626,7 +628,7 @@ export default function ReportFormPage() {
             finalChecklist.items[itemId].checks[
               checkIndex
             ].afterPhotoPreview = undefined;
-            const desc = uploadedDescriptions.get(checkId);
+            const desc = uploadedAfterDescriptions.get(checkId);
             if (desc) {
               finalChecklist.items[itemId].checks[
                 checkIndex
