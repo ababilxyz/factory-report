@@ -159,7 +159,6 @@ export async function createReport(
 ): Promise<string> {
   const reportId = uuidv4()
   const deviceId = await getDeviceFingerprint()
-  const worker = await getUserProfile(workerUid)
 
   // Fetch item to get areaId for area name lookup
   const item = await getItem(input.areaId)
@@ -202,7 +201,7 @@ export async function createReport(
     area_id: actualAreaId,
     area_name: area?.name,
     worker_uid: workerUid,
-    worker_name: worker?.displayName || null,
+    worker_name: (await getUserProfile(workerUid))?.displayName || null,
     description: input.description,
     status: 'pending',
     gps_lat: input.gpsLat,
@@ -382,7 +381,6 @@ export async function createWeeklyReport(
 ): Promise<string> {
   const reportId = uuidv4()
   const deviceId = await getDeviceFingerprint()
-  const worker = await getUserProfile(workerUid)
 
   const item = await getWeeklyItem(input.areaId)
   const area = item ? await getArea(item.areaId || '') : null
@@ -419,7 +417,7 @@ export async function createWeeklyReport(
     area_id: actualAreaId,
     area_name: area?.name,
     worker_uid: workerUid,
-    worker_name: worker?.displayName || null,
+    worker_name: (await getUserProfile(workerUid))?.displayName || null,
     description: input.description,
     status: 'pending',
     gps_lat: input.gpsLat,
