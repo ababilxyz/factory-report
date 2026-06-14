@@ -565,11 +565,8 @@ export default function ReportFormPage() {
       const totalPending = evidenceToUpload.length;
       let uploaded = 0;
 
-      // Track uploaded URLs - separate maps for issue and after photos
-      const uploadedIssueUrls = new Map<string, string>();
-      const uploadedAfterUrls = new Map<string, string>();
-      const uploadedIssueDescriptions = new Map<string, string>();
-      const uploadedAfterDescriptions = new Map<string, string>();
+      const uploadedIssuePhotos = new Map<string, string>();
+      const uploadedAfterPhotos = new Map<string, string>();
 
       // Upload all photos
       for (const evidence of evidenceToUpload) {
@@ -577,11 +574,9 @@ export default function ReportFormPage() {
         const result = await uploadImage(compressed);
 
         if (evidence.type === "issue") {
-          uploadedIssueUrls.set(evidence.checkId, result.url);
-          uploadedIssueDescriptions.set(evidence.checkId, evidence.description);
+          uploadedIssuePhotos.set(evidence.checkId, result.url);
         } else {
-          uploadedAfterUrls.set(evidence.checkId, result.url);
-          uploadedAfterDescriptions.set(evidence.checkId, evidence.description);
+          uploadedAfterPhotos.set(evidence.checkId, result.url);
         }
 
         uploaded++;
@@ -592,7 +587,7 @@ export default function ReportFormPage() {
       const finalChecklist = JSON.parse(JSON.stringify(checklistData));
 
       // Apply uploaded issue photo URLs
-      for (const [checkId, url] of uploadedIssueUrls) {
+      for (const [checkId, url] of uploadedIssuePhotos) {
         for (const itemId in finalChecklist.items) {
           const checkIndex = finalChecklist.items[itemId].checks.findIndex(
             (c: any) => c.id === checkId,
@@ -604,19 +599,13 @@ export default function ReportFormPage() {
             finalChecklist.items[itemId].checks[
               checkIndex
             ].issuePhotoPreview = undefined;
-            const desc = uploadedIssueDescriptions.get(checkId);
-            if (desc) {
-              finalChecklist.items[itemId].checks[
-                checkIndex
-              ].issueDescription = desc;
-            }
             break;
           }
         }
       }
 
       // Apply uploaded after photo URLs
-      for (const [checkId, url] of uploadedAfterUrls) {
+      for (const [checkId, url] of uploadedAfterPhotos) {
         for (const itemId in finalChecklist.items) {
           const checkIndex = finalChecklist.items[itemId].checks.findIndex(
             (c: any) => c.id === checkId,
@@ -628,12 +617,6 @@ export default function ReportFormPage() {
             finalChecklist.items[itemId].checks[
               checkIndex
             ].afterPhotoPreview = undefined;
-            const desc = uploadedAfterDescriptions.get(checkId);
-            if (desc) {
-              finalChecklist.items[itemId].checks[
-                checkIndex
-              ].afterDescription = desc;
-            }
             break;
           }
         }
