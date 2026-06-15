@@ -374,6 +374,73 @@ export async function getWeeklyChecksByItemId(itemId: string): Promise<ItemCheck
   }))
 }
 
+export async function createMonthlyReport(
+  input: CreateReportInput & { reportType?: ReportType; monthStart?: number },
+  workerUid: string,
+  onProgress?: (percent: number) => void
+): Promise<string> {
+  const reportId = uuidv4()
+  const deviceId = await getDeviceFingerprint()
+
+  const item = await getItem(input.areaId)
+  const area = item ? await getArea(item.areaId || '') : null
+
+  let beforePhotoUrl: string | undefined
+  let afterPhotoUrl: string | undefined
+  let totalProgress = 0
+
+  if (input.beforePhotoFile) {
+    const compressed = await compressImage(input.beforePhotoFile)
+    const result = await uploadImage(compressed, (percent) => {
+      totalProgress = Math.round(percent * 0.5)
+      if (onProgress) onProgress(totalProgress)
+    })
+    beforePhotoUrl = result.url
+  }
+
+  if (input.afterPhotoFile) {
+    const compressed = await compressImage(input.afterPhotoFile)
+    const result = await uploadImage(compressed, (percent) => {
+      totalProgress = 50 + Math.round(percent * 0.5)
+      if (onProgress) onProgress(totalProgress)
+    })
+    afterPhotoUrl = result.url
+  }
+
+  let actualAreaId = input.areaId
+  if (item && item.areaId) {
+    actualAreaId = item.areaId
+  }
+
+  const report: any = {
+    report_id: reportId,
+    area_id: actualAreaId,
+    area_name: area?.name,
+    worker_uid: workerUid,
+    worker_name: (await getUserProfile(workerUid))?.displayName || null,
+    description: input.description,
+    status: 'pending',
+    gps_lat: input.gpsLat,
+    gps_lng: input.gpsLng,
+    timestamp: Date.now(),
+    device_id: deviceId,
+    session_id: input.sessionId,
+    report_type: 'monthly',
+    month_start: input.monthStart || null
+  }
+
+  if (beforePhotoUrl) report.before_photo_url = beforePhotoUrl
+  if (afterPhotoUrl) report.after_photo_url = afterPhotoUrl
+  if (input.checklistData) report.checklist_data = input.checklistData
+
+  const { error } = await supabase
+    .from('reports')
+    .insert(report)
+
+  if (error) throw error
+  return reportId
+}
+
 export async function createWeeklyReport(
   input: CreateReportInput & { reportType?: ReportType; weekStart?: number },
   workerUid: string,
@@ -426,7 +493,76 @@ export async function createWeeklyReport(
     device_id: deviceId,
     session_id: input.sessionId,
     report_type: 'weekly',
-    week_start: input.weekStart || null
+    week_start: input.weekStart || null,
+    month_start: null
+  }
+
+  if (beforePhotoUrl) report.before_photo_url = beforePhotoUrl
+  if (afterPhotoUrl) report.after_photo_url = afterPhotoUrl
+  if (input.checklistData) report.checklist_data = input.checklistData
+
+  const { error } = await supabase
+    .from('reports')
+    .insert(report)
+
+  if (error) throw error
+  return reportId
+}
+
+export async function createMonthlyReport(
+  input: CreateReportInput & { reportType?: ReportType; monthStart?: number },
+  workerUid: string,
+  onProgress?: (percent: number) => void
+): Promise<string> {
+  const reportId = uuidv4()
+  const deviceId = await getDeviceFingerprint()
+
+  const item = await getItem(input.areaId)
+  const area = item ? await getArea(item.areaId || '') : null
+
+  let beforePhotoUrl: string | undefined
+  let afterPhotoUrl: string | undefined
+  let totalProgress = 0
+
+  if (input.beforePhotoFile) {
+    const compressed = await compressImage(input.beforePhotoFile)
+    const result = await uploadImage(compressed, (percent) => {
+      totalProgress = Math.round(percent * 0.5)
+      if (onProgress) onProgress(totalProgress)
+    })
+    beforePhotoUrl = result.url
+  }
+
+  if (input.afterPhotoFile) {
+    const compressed = await compressImage(input.afterPhotoFile)
+    const result = await uploadImage(compressed, (percent) => {
+      totalProgress = 50 + Math.round(percent * 0.5)
+      if (onProgress) onProgress(totalProgress)
+    })
+    afterPhotoUrl = result.url
+  }
+
+  let actualAreaId = input.areaId
+  if (item && item.areaId) {
+    actualAreaId = item.areaId
+  }
+
+  const report: any = {
+    report_id: reportId,
+    area_id: actualAreaId,
+    area_name: area?.name,
+    worker_uid: workerUid,
+    worker_name: (await getUserProfile(workerUid))?.displayName || null,
+    description: input.description,
+    status: 'pending',
+    gps_lat: input.gpsLat,
+    gps_lng: input.gpsLng,
+    timestamp: Date.now(),
+    device_id: deviceId,
+    session_id: input.sessionId,
+    report_type: 'monthly',
+    month_start: input.monthStart || null,
+    week_start: null
   }
 
   if (beforePhotoUrl) report.before_photo_url = beforePhotoUrl
@@ -498,6 +634,69 @@ export async function getWeeklyReportsByWorkerId(workerUid: string, weekStart: n
     sessionId: d.session_id,
     reportType: d.report_type,
     weekStart: d.week_start,
+    monthStart: d.month_start,
+    checklistData: d.checklist_data
+  })) as Report[]
+}
+
+export async function getMonthlyReports(monthStart: number): Promise<Report[]> {
+  const monthEnd = monthStart + 86_400_000 * 31
+  const { data, error } = await supabase
+    .from('reports')
+    .select('*')
+    .eq('report_type', 'monthly')
+    .eq('month_start', monthStart)
+    .order('timestamp', { ascending: false })
+
+  if (error) throw error
+  return (data || []).map((d: any) => ({
+    reportId: d.report_id,
+    areaId: d.area_id,
+    areaName: d.area_name,
+    workerUid: d.worker_uid,
+    workerName: d.worker_name,
+    beforePhotoUrl: d.before_photo_url,
+    afterPhotoUrl: d.after_photo_url,
+    description: d.description,
+    status: d.status,
+    gpsLat: d.gps_lat,
+    gpsLng: d.gps_lng,
+    timestamp: d.timestamp,
+    deviceId: d.device_id,
+    sessionId: d.session_id,
+    reportType: d.report_type,
+    monthStart: d.month_start,
+    checklistData: d.checklist_data
+  })) as Report[]
+}
+
+export async function getMonthlyReportsByWorkerId(workerUid: string, monthStart: number): Promise<Report[]> {
+  const { data, error } = await supabase
+    .from('reports')
+    .select('*')
+    .eq('worker_uid', workerUid)
+    .eq('report_type', 'monthly')
+    .eq('month_start', monthStart)
+    .order('timestamp', { ascending: false })
+
+  if (error) throw error
+  return (data || []).map((d: any) => ({
+    reportId: d.report_id,
+    areaId: d.area_id,
+    areaName: d.area_name,
+    workerUid: d.worker_uid,
+    workerName: d.worker_name,
+    beforePhotoUrl: d.before_photo_url,
+    afterPhotoUrl: d.after_photo_url,
+    description: d.description,
+    status: d.status,
+    gpsLat: d.gps_lat,
+    gpsLng: d.gps_lng,
+    timestamp: d.timestamp,
+    deviceId: d.device_id,
+    sessionId: d.session_id,
+    reportType: d.report_type,
+    monthStart: d.month_start,
     checklistData: d.checklist_data
   })) as Report[]
 }

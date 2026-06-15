@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { createReport, createWeeklyReport, getChecksByItemId, getItem, getWeeklyItem, getWeeklyChecksByItemId } from "../lib/supabaseDb";
+  import { createReport, createWeeklyReport, createMonthlyReport, getChecksByItemId, getItem, getWeeklyItem, getWeeklyChecksByItemId } from "../lib/supabaseDb";
 import { openCameraCapture, compressImage } from "../utils/imageUtils";
 import { uploadImage } from "../lib/storage";
 import type { ScanResult, ChecklistData, Item, CheckItem } from "../types";
@@ -642,6 +642,18 @@ export default function ReportFormPage() {
             ...baseInput,
             reportType: 'weekly',
             weekStart: weekStart.getTime(),
+          },
+          appUser.uid,
+        );
+      } else if (scanResult.reportType === 'monthly') {
+        const monthStart = new Date();
+        monthStart.setHours(0, 0, 0, 0);
+        monthStart.setDate(1);
+        await createMonthlyReport(
+          {
+            ...baseInput,
+            reportType: 'monthly',
+            monthStart: monthStart.getTime(),
           },
           appUser.uid,
         );

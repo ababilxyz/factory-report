@@ -10,6 +10,7 @@ import {
   getItemsByAreaId,
   getWeeklyItemsByAreaId,
   getWeeklyReports,
+  getMonthlyReports,
 } from "../lib/supabaseDb"
 import type { Report, ReportStatus, Area, Item, ChecklistData } from "../types"
 import { motion, AnimatePresence } from "framer-motion"
@@ -81,7 +82,7 @@ export default function AdminDashboard() {
   const { appUser, signOut } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [reportMode, setReportMode] = useState<"daily" | "weekly">("daily")
+  const [reportMode, setReportMode] = useState<"daily" | "weekly" | "monthly">("daily")
   const [filter, setFilter] = useState<ReportStatus | "all">("all")
   const [areaFilter, setAreaFilter] = useState<string | "all">("all")
   const [selectedReport, setSelectedReport] = useState<Report | null>(null)
@@ -97,6 +98,12 @@ export default function AdminDashboard() {
     const day = d.getDay()
     const diff = d.getDate() - day + (day === 0 ? -6 : 1)
     return new Date(d.setDate(diff)).setHours(0, 0, 0, 0)
+  }, [])
+  const monthStart = useMemo(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    d.setDate(1)
+    return d.getTime()
   }, [])
   const [weekStartOverride, setWeekStartOverride] = useState<number | null>(null)
   const activeWeekStart = weekStartOverride ?? weekStart
@@ -125,6 +132,9 @@ export default function AdminDashboard() {
     queryFn: async () => {
       if (reportMode === "weekly") {
         return getWeeklyReports(activeWeekStart)
+      }
+      if (reportMode === "monthly") {
+        return getMonthlyReports(monthStart)
       }
       if (filter === "all") {
         return getReports(undefined, undefined, "daily")
@@ -167,8 +177,23 @@ export default function AdminDashboard() {
     enabled: areas.length > 0 && reportMode === "weekly",
   })
 
+  const { data: monthlyItemsByArea = {} } = useQuery({
+    queryKey: ["monthlyItemsByArea"],
+    queryFn: async () => {
+      const map: Record<string, Item[]> = {}
+      await Promise.all(
+        areas.map(async (area) => {
+          const items = await getWeeklyItemsByAreaId(area.areaId)
+          map[area.areaId] = items
+        })
+      )
+      return map
+    },
+    enabled: areas.length > 0 && reportMode === "monthly",
+  })
+
   const itemsByArea =
-    reportMode === "weekly" ? weeklyItemsByArea : dailyItemsByArea
+    reportMode === "weekly" ? weeklyItemsByArea : reportMode === "monthly" ? monthlyItemsByArea : dailyItemsByArea
 
   const mutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: ReportStatus }) =>
@@ -206,12 +231,14 @@ export default function AdminDashboard() {
       return results
     }
 
-    const weeklyReports = (reports as Report[]).filter((r: Report) => r.timestamp >= activeWeekStart && r.timestamp < weekEnd)
+    const windowStart = reportMode === "weekly" ? activeWeekStart : monthStart
+    const windowEnd = reportMode === "weekly" ? weekEnd : windowStart + 86_400_000 * 31
+    const windowReports = (reports as Report[]).filter((r: Report) => r.timestamp >= windowStart && r.timestamp < windowEnd)
     const results: { area: Area; item: Item }[] = []
     for (const area of areas) {
       const items = itemsByArea[area.areaId] || []
       for (const item of items) {
-        const wasReported = weeklyReports.some((r) => {
+        const wasReported = windowReports.some((r) => {
           const checklist = r.checklistData as ChecklistData | undefined
           if (!checklist?.items) return false
           return Object.values(checklist.items).some(
@@ -224,7 +251,7 @@ export default function AdminDashboard() {
       }
     }
     return results
-  }, [reportMode, areas, itemsByArea, reports, resetDate, activeWeekStart, weekEnd])
+  }, [reportMode, areas, itemsByArea, reports, resetDate, activeWeekStart, monthStart, weekEnd])
 
   const filtered =
     filter === "all" ? reports : reports.filter((r) => r.status === filter)
@@ -239,12 +266,23 @@ export default function AdminDashboard() {
     const map: Record<number, Report[]> = {}
     const source = areaFiltered
     for (const report of source) {
-      if (reportMode === "weekly" && (report as any).reportType === "weekly" && (report as any).weekStart) {
+      const isWeekly = reportMode === "weekly" && (report as any).reportType === "weekly" && (report as any).weekStart
+      const isMonthly = reportMode === "monthly" && (report as any).reportType === "monthly" && (report as any).monthStart
+
+      if (isWeekly) {
         const dayKey = (report as any).weekStart
         if (!map[dayKey]) map[dayKey] = []
         map[dayKey].push(report)
         continue
       }
+
+      if (isMonthly) {
+        const dayKey = (report as any).monthStart
+        if (!map[dayKey]) map[dayKey] = []
+        map[dayKey].push(report)
+        continue
+      }
+
       const dayKey = getStartOfDay(report.timestamp)
       if (!map[dayKey]) map[dayKey] = []
       map[dayKey].push(report)
@@ -256,12 +294,16 @@ export default function AdminDashboard() {
     .map(Number)
     .sort((a, b) => b - a)
 
-  const resetDateLabel = new Date(resetDate).toLocaleDateString("en-US", {
-    weekday: "long",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  })
+  const resetDateLabel = reportMode === 'weekly'
+    ? `Week of ${new Date(activeWeekStart).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}`
+    : reportMode === 'monthly'
+      ? new Date(monthStart).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+      : new Date(resetDate).toLocaleDateString("en-US", {
+          weekday: "long",
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-100 overflow-x-hidden">
@@ -401,9 +443,11 @@ export default function AdminDashboard() {
             <section className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
               <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
                 <h2 className="text-sm font-semibold">
-                  {reportMode === "weekly"
-                    ? `Not reported this week (${candidates.length})`
-                    : `Not reported today (${candidates.length})`}
+            {reportMode === "weekly"
+              ? `Not reported this week (${candidates.length})`
+              : reportMode === "monthly"
+                ? `Not reported this month (${candidates.length})`
+                : `Not reported today (${candidates.length})`}
                 </h2>
               </div>
 
@@ -413,13 +457,17 @@ export default function AdminDashboard() {
                 </div>
               ) : candidates.length === 0 ? (
                 <div className="px-4 py-6 text-center text-sm text-slate-400">
-                  {areaFilter === "all"
-                    ? reportMode === "weekly"
-                      ? "All zones and items have been reported this week."
-                      : "All zones and items have been reported today."
-                    : reportMode === "weekly"
-                      ? "All items in this zone have been reported this week."
-                      : `All items in this zone have been reported today.`}
+                    {areaFilter === "all"
+                      ? reportMode === "weekly"
+                        ? "All zones and items have been reported this week."
+                        : reportMode === "monthly"
+                          ? "All zones and items have been reported this month."
+                          : "All zones and items have been reported today."
+                      : reportMode === "weekly"
+                        ? "All items in this zone have been reported this week."
+                        : reportMode === "monthly"
+                          ? "All items in this zone have been reported this month."
+                          : `All items in this zone have been reported today.`}
                 </div>
               ) : (
                 <div className="divide-y divide-white/5 max-h-[320px] overflow-y-auto">

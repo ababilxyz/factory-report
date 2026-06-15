@@ -38,7 +38,7 @@ export interface QrPayload {
 // Report Types
 // ==================
 export type ReportStatus = 'pending' | 'in_progress' | 'resolved'
-export type ReportType = 'daily' | 'weekly'
+export type ReportType = 'daily' | 'weekly' | 'monthly'
 
 export interface CheckItem {
     id: string
@@ -98,6 +98,7 @@ export interface Report {
     checklistData?: ChecklistData  // New field for structured checklist
     reportType?: ReportType
     weekStart?: number
+    monthStart?: number
 }
 
 export interface CreateReportInput {
@@ -129,7 +130,7 @@ export interface ScanResult {
   gpsLat: number
   gpsLng: number
   examplePhotoUrl?: string  // Optional example photo from scanned item
-  reportType?: 'daily' | 'weekly'
+  reportType?: 'daily' | 'weekly' | 'monthly'
 }
 
 export interface ScanError {
