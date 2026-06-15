@@ -124,13 +124,6 @@ export async function getItemsByAreaId(areaId: string): Promise<Item[]> {
 // ==================
 // Checks (per item)
 // ==================
-export interface ItemCheck {
-  id: string
-  itemId: string
-  checkLabel: string
-  checkOptions: string[]
-  displayOrder: number
-}
 
 export async function getChecksByItemId(itemId: string): Promise<ItemCheck[]> {
   const { data, error } = await supabase
