@@ -101,14 +101,17 @@ export function useQrScanner() {
         }
       }
 
+      if (!item && payloadReportType === 'monthly') {
+        const monthlyItem = await getMonthlyItem(payload.areaId)
+        if (monthlyItem) {
+          item = monthlyItem
+          reportType = 'monthly'
+        }
+      }
+
       if (!item) {
         item = await getItem(payload.areaId)
         reportType = 'daily'
-      }
-
-      if (!item && payloadReportType === 'monthly') {
-        item = await getMonthlyItem(payload.areaId)
-        reportType = 'monthly'
       }
 
       if (!item) {
