@@ -53,7 +53,8 @@ export function decryptQrPayload(encryptedString: string): QrPayload {
     // Use existing nonce or fallback for backward compatibility
     payload = {
       areaId: parsed.areaId,
-      nonce: parsed.nonce || decrypted
+      nonce: parsed.nonce || decrypted,
+      reportType: parsed.reportType,
     }
   } catch (parseError) {
     // Log for debugging
