@@ -669,11 +669,13 @@ export default function ReportFormPage() {
 
       setSubmitted(true);
     } catch (err) {
-      setSubmitError(
-        err instanceof Error
-          ? err.message
-          : "Submission failed. Please try again.",
-      );
+      const msg = err instanceof Error
+        ? err.message
+        : typeof err === 'object' && err !== null && 'message' in err
+          ? String((err as any).message)
+          : "Submission failed. Please try again.";
+      console.error('Report submit error:', err);
+      setSubmitError(msg);
     } finally {
       setSubmitting(false);
     }
