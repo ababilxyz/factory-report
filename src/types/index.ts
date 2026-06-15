@@ -30,6 +30,7 @@ export interface Area {
 export interface QrPayload {
   areaId: string  // Now represents itemId, but kept for backward compatibility
   nonce: string
+  reportType?: 'daily' | 'weekly' | 'monthly'
   // Legacy fields - ignored but accepted for backward compatibility
   timestamp?: number
 }

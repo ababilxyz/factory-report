@@ -1,5 +1,5 @@
 import CryptoJS from 'crypto-js'
-import type { QrPayload } from '../types'
+import type { QrPayload, ReportType } from '../types'
 
 const SECRET_KEY = import.meta.env.VITE_QR_SECRET_KEY as string
 
@@ -11,11 +11,12 @@ if (!SECRET_KEY || SECRET_KEY.length < 32) {
  * Encrypt a QR payload using AES-256.
  * Generates reusable QR codes per item (itemId = itemId for same value).
  */
-export function encryptQrPayload(itemId: string): string {
+export function encryptQrPayload(itemId: string, reportType: ReportType = 'daily'): string {
   // Deterministic nonce (reusable) - can be regenerated from itemId
   const payload: QrPayload = {
     areaId: itemId,
-    nonce: itemId
+    nonce: itemId,
+    reportType
   }
   const json = JSON.stringify(payload)
   const encrypted = CryptoJS.AES.encrypt(json, SECRET_KEY).toString()

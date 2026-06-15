@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-  import { createReport, createWeeklyReport, createMonthlyReport, getChecksByItemId, getItem, getWeeklyItem, getWeeklyChecksByItemId } from "../lib/supabaseDb";
+  import { createReport, createWeeklyReport, createMonthlyReport, getChecksByItemId, getItem, getWeeklyItem, getWeeklyChecksByItemId, getMonthlyItem, getMonthlyChecksByItemId } from "../lib/supabaseDb";
 import { openCameraCapture, compressImage } from "../utils/imageUtils";
 import { uploadImage } from "../lib/storage";
 import type { ScanResult, ChecklistData, Item, CheckItem } from "../types";
@@ -19,7 +19,11 @@ async function fetchChecklistFromDb(
   reportType?: 'daily' | 'weekly' | 'monthly'
 ): Promise<ChecklistData | null> {
   // First get item data
-  const item = reportType === 'weekly' ? await getWeeklyItem(itemId) : await getItem(itemId);
+  const item = reportType === 'weekly'
+    ? await getWeeklyItem(itemId)
+    : reportType === 'monthly'
+      ? await getMonthlyItem(itemId)
+      : await getItem(itemId);
   if (!item) {
     console.error("Item not found:", itemId, "reportType:", reportType);
     return null;
@@ -30,7 +34,9 @@ async function fetchChecklistFromDb(
   try {
     const itemChecks = reportType === 'weekly'
       ? await getWeeklyChecksByItemId(itemId)
-      : await getChecksByItemId(itemId);
+      : reportType === 'monthly'
+        ? await getMonthlyChecksByItemId(itemId)
+        : await getChecksByItemId(itemId);
     checks.push(
       ...itemChecks.map((c, index) => ({
         id: generateCheckId(c.checkLabel, item.code, index),

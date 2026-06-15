@@ -6,6 +6,7 @@ import {
   getAllAreas,
   getItemsByAreaId,
   getWeeklyItemsByAreaId,
+  getMonthlyItemsByAreaId,
 } from '../lib/supabaseDb'
 import { useQuery } from '@tanstack/react-query'
 import type { Area, Item, ReportType } from '../types'
@@ -30,15 +31,16 @@ export default function QrGeneratorPage() {
       if (!selectedArea) return Promise.resolve([])
       return reportMode === 'weekly'
         ? getWeeklyItemsByAreaId(selectedArea.areaId)
-        : getItemsByAreaId(selectedArea.areaId)
+        : reportMode === 'monthly'
+          ? getMonthlyItemsByAreaId(selectedArea.areaId)
+          : getItemsByAreaId(selectedArea.areaId)
     },
     enabled: !!selectedArea,
   })
 
   function generateQr(item: Item, area: Area) {
-    // Use actual item id for daily, or weekly item id for weekly
     const targetItemId = item.id
-    const encrypted = encryptQrPayload(targetItemId)
+    const encrypted = encryptQrPayload(targetItemId, reportMode)
     setSelectedItem(item)
     setSelectedArea(area)
     setGeneratedPayload(encrypted)
@@ -94,6 +96,20 @@ export default function QrGeneratorPage() {
             >
               Weekly
             </button>
+            <button
+              onClick={() => {
+                setReportMode('monthly')
+                setSelectedItem(null)
+                setGeneratedPayload(null)
+              }}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                reportMode === 'monthly'
+                  ? 'bg-[#0d9488] text-white'
+                  : 'text-slate-300 hover:bg-white/5'
+              }`}
+            >
+              Monthly
+            </button>
           </div>
         </section>
 
@@ -132,7 +148,9 @@ export default function QrGeneratorPage() {
             <h2 className="text-sm text-slate-400">
               {reportMode === 'weekly'
                 ? `Weekly items in ${selectedArea.name}`
-                : `Items in ${selectedArea.name}`}
+                : reportMode === 'monthly'
+                  ? `Monthly items in ${selectedArea.name}`
+                  : `Items in ${selectedArea.name}`}
             </h2>
             {itemsLoading ? (
               <div className="flex justify-center py-12">
@@ -140,9 +158,11 @@ export default function QrGeneratorPage() {
               </div>
             ) : items.length === 0 ? (
               <p className="text-sm text-slate-500">
-                {reportMode === 'weekly'
-                  ? 'No weekly items in this area.'
-                  : 'No items in this area.'}
+                  {reportMode === 'weekly'
+                    ? 'No weekly items in this area.'
+                    : reportMode === 'monthly'
+                      ? 'No monthly items in this area.'
+                      : 'No items in this area.'}
               </p>
             ) : (
               <div className="space-y-2">
@@ -160,6 +180,11 @@ export default function QrGeneratorPage() {
                       {reportMode === 'weekly' && (
                         <span className="text-[11px] px-2 py-0.5 rounded-full border border-white/10 text-slate-200">
                           Weekly
+                        </span>
+                      )}
+                      {reportMode === 'monthly' && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full border border-white/10 text-slate-200">
+                          Monthly
                         </span>
                       )}
                     </div>

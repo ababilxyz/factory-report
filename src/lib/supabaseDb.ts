@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { v4 as uuidv4 } from 'uuid'
-import type { AppUser, Area, Report, CreateReportInput, ReportStatus, Item, ReportType } from '../types'
+import type { AppUser, Area, Report, CreateReportInput, ReportStatus, Item, ReportType, ItemCheck } from '../types'
 import { uploadImage } from './storage'
 import { compressImage } from '../utils/imageUtils'
 import { getDeviceFingerprint } from '../utils/deviceFingerprint'
@@ -373,6 +373,71 @@ export async function getWeeklyChecksByItemId(itemId: string): Promise<ItemCheck
     displayOrder: d.display_order
   }))
 }
+
+// ==================
+// Monthly Items & Checks
+// ==================
+
+export async function getMonthlyItemsByAreaId(areaId: string): Promise<Item[]> {
+  const { data, error } = await supabase
+    .from('monthly_items')
+    .select('item_id, area_id, code, name, encrypted_qr_payload, display_order, example_photo_url')
+    .eq('area_id', areaId)
+    .order('display_order', { ascending: true })
+
+  if (error) throw error
+  return (data || []).map((d: any) => ({
+    id: d.item_id,
+    areaId: d.area_id,
+    code: d.code,
+    name: d.name,
+    order: d.display_order,
+    checks: [],
+    examplePhotoUrl: d.example_photo_url,
+    reportType: 'monthly'
+  }))
+}
+
+export async function getMonthlyItem(itemId: string): Promise<Item | null> {
+  const { data, error } = await supabase
+    .from('monthly_items')
+    .select('item_id, area_id, code, name, encrypted_qr_payload, display_order, example_photo_url')
+    .eq('item_id', itemId)
+    .single()
+
+  if (error || !data) return null
+  return {
+    id: data.item_id,
+    areaId: data.area_id,
+    code: data.code,
+    name: data.name,
+    order: data.display_order,
+    checks: [],
+    examplePhotoUrl: data.example_photo_url,
+    reportType: 'monthly'
+  }
+}
+
+export async function getMonthlyChecksByItemId(itemId: string): Promise<ItemCheck[]> {
+  const { data, error } = await supabase
+    .from('monthly_item_checks')
+    .select('id, item_id, check_label, check_options, display_order')
+    .eq('item_id', itemId)
+    .order('display_order', { ascending: true })
+
+  if (error) throw error
+  return (data || []).map((d: any) => ({
+    id: d.id,
+    itemId: d.item_id,
+    checkLabel: d.check_label,
+    checkOptions: d.check_options,
+    displayOrder: d.display_order
+  }))
+}
+
+// ==================
+// Monthly Reports
+// ==================
 
 export async function createMonthlyReport(
   input: CreateReportInput & { reportType?: ReportType; monthStart?: number },

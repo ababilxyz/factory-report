@@ -86,14 +86,29 @@ export function useQrScanner() {
 
       // Step 2: Load item from database
       setStatusMessage('Loading item data...')
-      let item = await getItem(payload.areaId)
-      let reportType: 'daily' | 'weekly' = 'daily'
-      if (!item) {
+
+      // Determine reportType from payload if available
+      const payloadReportType = (payload as any).reportType as 'daily' | 'weekly' | 'monthly' | undefined
+
+      let item: any = null
+      let reportType: 'daily' | 'weekly' | 'monthly' = 'daily'
+
+      if (payloadReportType === 'weekly') {
         const weeklyItem = await getWeeklyItem(payload.areaId)
         if (weeklyItem) {
           item = weeklyItem
           reportType = 'weekly'
         }
+      }
+
+      if (!item) {
+        item = await getItem(payload.areaId)
+        reportType = 'daily'
+      }
+
+      if (!item && payloadReportType === 'monthly') {
+        item = await getMonthlyItem(payload.areaId)
+        reportType = 'monthly'
       }
 
       if (!item) {

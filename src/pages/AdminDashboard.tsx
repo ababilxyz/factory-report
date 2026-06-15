@@ -9,6 +9,7 @@ import {
   getAllAreas,
   getItemsByAreaId,
   getWeeklyItemsByAreaId,
+  getMonthlyItemsByAreaId,
   getWeeklyReports,
   getMonthlyReports,
 } from "../lib/supabaseDb"
@@ -109,14 +110,17 @@ export default function AdminDashboard() {
   const activeWeekStart = weekStartOverride ?? weekStart
   const weekEnd = activeWeekStart + 86_400_000 * 7
 
-  // Auto-update resetDate at midnight
+  // Reset at day/week/month boundaries
   useEffect(() => {
     const interval = setInterval(() => {
-      const newToday = getStartOfDay(Date.now())
-      setResetDate((prev) => (prev !== newToday ? newToday : prev))
+      const now = Date.now()
+      const newDay = getStartOfDay(now)
+      setResetDate((prev) => (prev !== newDay ? newDay : prev))
+      // Invalidate report data when any boundary might have crossed
+      queryClient.invalidateQueries({ queryKey: ["reports"] })
     }, 60_000)
     return () => clearInterval(interval)
-  }, [])
+  }, [queryClient])
 
   const workerUid = selectedReport?.workerUid
   const { data: resolvedWorker } = useQuery({
@@ -128,7 +132,7 @@ export default function AdminDashboard() {
   const workerDisplayName = selectedReport?.workerName || resolvedWorker?.displayName || null
 
   const { data: reports = [], isLoading } = useQuery({
-    queryKey: ["reports", filter, reportMode],
+    queryKey: ["reports", filter, reportMode, resetDate, activeWeekStart, monthStart],
     queryFn: async () => {
       if (reportMode === "weekly") {
         return getWeeklyReports(activeWeekStart)
@@ -183,8 +187,7 @@ export default function AdminDashboard() {
       const map: Record<string, Item[]> = {}
       await Promise.all(
         areas.map(async (area) => {
-          const items = await getWeeklyItemsByAreaId(area.areaId)
-          map[area.areaId] = items
+          map[area.areaId] = await getMonthlyItemsByAreaId(area.areaId)
         })
       )
       return map
@@ -376,6 +379,16 @@ export default function AdminDashboard() {
               >
                 Weekly
               </button>
+              <button
+                onClick={() => setReportMode("monthly")}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  reportMode === "monthly"
+                    ? "bg-[#0d9488] text-white"
+                    : "text-slate-300 hover:bg-white/5"
+                }`}
+              >
+                Monthly
+              </button>
             </div>
           </div>
           <div>
@@ -405,27 +418,39 @@ export default function AdminDashboard() {
 
         {/* ================== Daily Summary Stat Cards ================== */}
         <section className="grid grid-cols-3 gap-3">
-          {[
-            { label: reportMode === "weekly" ? "This Week" : "Today Reported", value: areaFiltered.length },
-            {
-              label: "Pending",
-              value: areaFiltered.filter((r) => r.status === "pending").length,
-            },
-            {
-              label: "Resolved",
-              value: areaFiltered.filter((r) => r.status === "resolved").length,
-            },
-          ].map((stat) => (
-            <div
-              key={stat.label}
-              className="rounded-xl border border-white/10 bg-white/5 p-4 text-center"
-            >
-              <p className="text-2xl font-semibold tracking-tight">
-                {stat.value}
-              </p>
-              <p className="text-sm text-slate-400 mt-1">{stat.label}</p>
-            </div>
-          ))}
+          {(() => {
+            const windowedReports = (() => {
+              if (reportMode === "weekly") {
+                return areaFiltered.filter((r) => r.timestamp >= activeWeekStart && r.timestamp < weekEnd)
+              }
+              if (reportMode === "monthly") {
+                return areaFiltered.filter((r) => r.timestamp >= monthStart)
+              }
+              const dayEnd = resetDate + 86_400_000
+              return areaFiltered.filter((r) => r.timestamp >= resetDate && r.timestamp < dayEnd)
+            })()
+            return [
+              { label: reportMode === "weekly" ? "This Week" : reportMode === "monthly" ? "This Month" : "Today Reported", value: windowedReports.length },
+              {
+                label: "Pending",
+                value: windowedReports.filter((r) => r.status === "pending").length,
+              },
+              {
+                label: "Resolved",
+                value: windowedReports.filter((r) => r.status === "resolved").length,
+              },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-xl border border-white/10 bg-white/5 p-4 text-center"
+              >
+                <p className="text-2xl font-semibold tracking-tight">
+                  {stat.value}
+                </p>
+                <p className="text-sm text-slate-400 mt-1">{stat.label}</p>
+              </div>
+            ))
+          })()}
         </section>
 
         {/* ================== Not Reported Today ================== */}
