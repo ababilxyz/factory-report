@@ -509,74 +509,6 @@ export async function createWeeklyReport(
   return reportId
 }
 
-export async function createMonthlyReport(
-  input: CreateReportInput & { reportType?: ReportType; monthStart?: number },
-  workerUid: string,
-  onProgress?: (percent: number) => void
-): Promise<string> {
-  const reportId = uuidv4()
-  const deviceId = await getDeviceFingerprint()
-
-  const item = await getItem(input.areaId)
-  const area = item ? await getArea(item.areaId || '') : null
-
-  let beforePhotoUrl: string | undefined
-  let afterPhotoUrl: string | undefined
-  let totalProgress = 0
-
-  if (input.beforePhotoFile) {
-    const compressed = await compressImage(input.beforePhotoFile)
-    const result = await uploadImage(compressed, (percent) => {
-      totalProgress = Math.round(percent * 0.5)
-      if (onProgress) onProgress(totalProgress)
-    })
-    beforePhotoUrl = result.url
-  }
-
-  if (input.afterPhotoFile) {
-    const compressed = await compressImage(input.afterPhotoFile)
-    const result = await uploadImage(compressed, (percent) => {
-      totalProgress = 50 + Math.round(percent * 0.5)
-      if (onProgress) onProgress(totalProgress)
-    })
-    afterPhotoUrl = result.url
-  }
-
-  let actualAreaId = input.areaId
-  if (item && item.areaId) {
-    actualAreaId = item.areaId
-  }
-
-  const report: any = {
-    report_id: reportId,
-    area_id: actualAreaId,
-    area_name: area?.name,
-    worker_uid: workerUid,
-    worker_name: (await getUserProfile(workerUid))?.displayName || null,
-    description: input.description,
-    status: 'pending',
-    gps_lat: input.gpsLat,
-    gps_lng: input.gpsLng,
-    timestamp: Date.now(),
-    device_id: deviceId,
-    session_id: input.sessionId,
-    report_type: 'monthly',
-    month_start: input.monthStart || null,
-    week_start: null
-  }
-
-  if (beforePhotoUrl) report.before_photo_url = beforePhotoUrl
-  if (afterPhotoUrl) report.after_photo_url = afterPhotoUrl
-  if (input.checklistData) report.checklist_data = input.checklistData
-
-  const { error } = await supabase
-    .from('reports')
-    .insert(report)
-
-  if (error) throw error
-  return reportId
-}
-
 export async function getWeeklyReports(weekStart: number): Promise<Report[]> {
   const { data, error } = await supabase
     .from('reports')
@@ -640,7 +572,6 @@ export async function getWeeklyReportsByWorkerId(workerUid: string, weekStart: n
 }
 
 export async function getMonthlyReports(monthStart: number): Promise<Report[]> {
-  const monthEnd = monthStart + 86_400_000 * 31
   const { data, error } = await supabase
     .from('reports')
     .select('*')

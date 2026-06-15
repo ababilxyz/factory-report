@@ -16,7 +16,7 @@ function generateCheckId(label: string, code: string, index: number): string {
 // Fetch checks from database for a specific item
 async function fetchChecklistFromDb(
   itemId: string,
-  reportType?: 'daily' | 'weekly'
+  reportType?: 'daily' | 'weekly' | 'monthly'
 ): Promise<ChecklistData | null> {
   // First get item data
   const item = reportType === 'weekly' ? await getWeeklyItem(itemId) : await getItem(itemId);
