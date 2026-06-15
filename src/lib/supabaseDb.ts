@@ -440,7 +440,7 @@ export async function createMonthlyReport(
   const reportId = uuidv4()
   const deviceId = await getDeviceFingerprint()
 
-  const item = await getItem(input.areaId)
+  const item = await getMonthlyItem(input.areaId)
   const area = item ? await getArea(item.areaId || '') : null
 
   let beforePhotoUrl: string | undefined
