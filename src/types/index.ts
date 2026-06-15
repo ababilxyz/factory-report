@@ -38,9 +38,26 @@ export interface QrPayload {
 // ==================
 // Report Types
 // ==================
+// ==================
+// Item Check Types (DB)
+// ==================
+
+/** Matches the `item_checks` / `weekly_item_checks` / `monthly_item_checks` table rows */
+export interface ItemCheck {
+  id: string
+  itemId: string
+  checkLabel: string
+  checkOptions: string[]
+  displayOrder: number
+}
+
+// ==================
+// Report Types
+// ==================
 export type ReportStatus = 'pending' | 'in_progress' | 'resolved'
 export type ReportType = 'daily' | 'weekly' | 'monthly'
 
+/** Check item in the UI form (selected option, photo previews, etc.) */
 export interface CheckItem {
     id: string
     label: string

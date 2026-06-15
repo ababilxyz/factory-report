@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { decryptQrPayload, DecryptionError } from '../utils/encryption'
 import { getCurrentPosition, haversineDistance } from '../utils/geolocation'
-import { getItem, getArea, getWeeklyItem } from '../lib/supabaseDb'
+import { getItem, getArea, getWeeklyItem, getMonthlyItem } from '../lib/supabaseDb'
 import type { ScanState, ScanResult, ScanError } from '../types'
 
 const SCANNER_ELEMENT_ID = 'qr-reader'
