@@ -15,6 +15,7 @@ export function useQrScanner() {
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const isProcessingRef = useRef(false)
   const startingRef = useRef(false)
+  const lastStartErrorRef = useRef<string | null>(null)
 
   const stopScanner = useCallback(async () => {
     if (scannerRef.current) {
@@ -24,13 +25,19 @@ export function useQrScanner() {
           await scannerRef.current.stop()
         }
       } catch { /* ignore stop errors */ }
+      try {
+        scannerRef.current.clear()
+      } catch { /* ignore clear errors */ }
       scannerRef.current = null
     }
   }, [])
 
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
   const startScanner = useCallback(async () => {
     if (startingRef.current) return
     startingRef.current = true
+    lastStartErrorRef.current = null
 
     setScanState('scanning')
     setError(null)
@@ -39,12 +46,31 @@ export function useQrScanner() {
 
     try {
       await stopScanner()
+      await wait(150)
+
       const scanner = new Html5Qrcode(SCANNER_ELEMENT_ID)
       scannerRef.current = scanner
 
+      let cameraId: string | undefined
+
+      try {
+        const cameras = await scanner.getCameras()
+        const back = cameras.find((c) => (c.label || '').toLowerCase().includes('back') || (c.label || '').toLowerCase().includes('rear'))
+        cameraId = back?.id || cameras[0]?.id
+      } catch {
+        cameraId = undefined
+      }
+
+      let cameraConstraint: { deviceId?: { exact: string } } | { facingMode: string } | undefined
+      if (cameraId) {
+        cameraConstraint = { deviceId: { exact: cameraId } }
+      } else {
+        cameraConstraint = { facingMode: 'environment' }
+      }
+
       await scanner.start(
-        { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-        { fps: 10, qrbox: { width: 280, height: 280 }, aspectRatio: 1.3333 },
+        cameraConstraint,
+        { fps: 10, qrbox: { width: 280, height: 280 } },
         async (decodedText) => {
           if (isProcessingRef.current) return
           isProcessingRef.current = true
@@ -56,13 +82,19 @@ export function useQrScanner() {
       )
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      if (msg.toLowerCase().includes('permission')) {
-        setError({ code: 'PERMISSION_DENIED', message: 'Camera permission denied. Please allow camera access in your browser settings.' })
-        setScanState('error')
-      } else {
-        setError({ code: 'CAMERA_ERROR', message: 'Could not start camera. Ensure no other app is using it, then try again.' })
-        setScanState('error')
+      lastStartErrorRef.current = msg
+
+      let friendly = 'Could not start camera. Ensure no other app is using it.'
+      if (/permission|not allowed|denied/i.test(msg)) {
+        friendly = 'Camera permission denied. Please allow camera access in your browser settings.'
+      } else if (/https|secure context|only secure origins/i.test(msg)) {
+        friendly = 'Camera requires HTTPS. Please use https:// to access this app when deployed.'
+      } else if (/not found|no camera|camera/i.test(msg)) {
+        friendly = 'No camera found on this device.'
       }
+
+      setError({ code: 'CAMERA_ERROR', message: friendly })
+      setScanState('error')
     } finally {
       startingRef.current = false
     }
@@ -70,7 +102,6 @@ export function useQrScanner() {
 
   async function processQrCode(rawText: string) {
     try {
-      // Step 1: Decrypt
       setScanState('decrypting')
       setStatusMessage('Verifying QR code...')
 
@@ -84,10 +115,8 @@ export function useQrScanner() {
         throw { code: 'DECRYPT_FAILED', message: 'Invalid QR code.' }
       }
 
-      // Step 2: Load item from database
       setStatusMessage('Loading item data...')
 
-      // Determine reportType from payload if available
       const payloadReportType = (payload as any).reportType as 'daily' | 'weekly' | 'monthly' | undefined
 
       let item: any = null
@@ -118,14 +147,12 @@ export function useQrScanner() {
         throw { code: 'AREA_NOT_FOUND', message: 'Item not found in the system. Contact your supervisor.' }
       }
 
-      // Step 3: Get area for GPS validation
       setStatusMessage('Loading area data...')
       const area = await getArea(item.areaId || payload.areaId)
       if (!area) {
         throw { code: 'AREA_NOT_FOUND', message: 'Area not found in the system. Contact your supervisor.' }
       }
 
-      // Step 4: Verify GPS location
       setScanState('verifying_location')
       setStatusMessage('Verifying your location...')
 
@@ -134,7 +161,6 @@ export function useQrScanner() {
         coords = await getCurrentPosition(12000)
       } catch (e: unknown) {
         const err = e as { code: string; message: string }
-        // Map GeolocationError codes to ScanError codes
         if (err.code === 'UNAVAILABLE' || err.code === 'TIMEOUT') {
           throw { code: 'PERMISSION_DENIED', message: err.message }
         }
@@ -149,10 +175,9 @@ export function useQrScanner() {
         }
       }
 
-      // All checks passed - return area info with item context
       setScanState('success')
       setResult({
-        areaId: payload.areaId, // itemId is passed for checklist lookup
+        areaId: payload.areaId,
         areaName: area.name,
         sessionId: payload.nonce,
         gpsLat: coords.lat,
@@ -176,6 +201,8 @@ export function useQrScanner() {
     setResult(null)
     setStatusMessage('')
     isProcessingRef.current = false
+    startingRef.current = false
+    lastStartErrorRef.current = null
   }, [stopScanner])
 
   // Cleanup on unmount
@@ -191,6 +218,6 @@ export function useQrScanner() {
     startScanner,
     stopScanner,
     reset,
-    SCANNER_ELEMENT_ID
+    SCANNER_ELEMENT_ID,
   }
 }
