@@ -54,7 +54,7 @@ export function useQrScanner() {
       let cameraId: string | undefined
 
       try {
-        const cameras = await scanner.getCameras()
+        const cameras = (await Html5Qrcode.getCameras()) as Array<{ id: string; label?: string }>
         const back = cameras.find((c) => (c.label || '').toLowerCase().includes('back') || (c.label || '').toLowerCase().includes('rear'))
         cameraId = back?.id || cameras[0]?.id
       } catch {
