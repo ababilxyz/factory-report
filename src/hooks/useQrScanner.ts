@@ -43,8 +43,8 @@ export function useQrScanner() {
       scannerRef.current = scanner
 
       await scanner.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 280, height: 280 } },
+        { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        { fps: 10, qrbox: { width: 280, height: 280 }, aspectRatio: 1.3333 },
         async (decodedText) => {
           if (isProcessingRef.current) return
           isProcessingRef.current = true
@@ -60,7 +60,7 @@ export function useQrScanner() {
         setError({ code: 'PERMISSION_DENIED', message: 'Camera permission denied. Please allow camera access in your browser settings.' })
         setScanState('error')
       } else {
-        setError({ code: 'CAMERA_ERROR', message: 'Could not start camera. Ensure no other app is using it.' })
+        setError({ code: 'CAMERA_ERROR', message: 'Could not start camera. Ensure no other app is using it, then try again.' })
         setScanState('error')
       }
     } finally {
