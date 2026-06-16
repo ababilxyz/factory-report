@@ -23,22 +23,28 @@ export default defineConfig({
           { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
         ]
       },
-     workbox: {
-  skipWaiting: true,
-  clientsClaim: true,
-  runtimeCaching: [
-    {
-      urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-      handler: 'NetworkFirst',
-      options: { cacheName: 'supabase-cache', networkTimeoutSeconds: 10 }
-    },
-    {
-      urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/.*/i,
-      handler: 'CacheFirst',
-      options: { cacheName: 'supabase-storage-images', expiration: { maxEntries: 50, maxAgeSeconds: 7 * 24 * 60 * 60 } }
-    }
-  ]
-}
+      workbox: {
+        globPatterns: [
+          'index.html',
+          'registerSW.js',
+          'assets/index-*.js',
+          'assets/index-*.css'
+        ],
+        skipWaiting: true,
+        clientsClaim: true,
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
+            handler: 'NetworkFirst',
+            options: { cacheName: 'supabase-cache', networkTimeoutSeconds: 10 }
+          },
+          {
+            urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/.*/i,
+            handler: 'CacheFirst',
+            options: { cacheName: 'supabase-storage-images', expiration: { maxEntries: 50, maxAgeSeconds: 7 * 24 * 60 * 60 } }
+          }
+        ]
+      }
     })
   ],
   resolve: {

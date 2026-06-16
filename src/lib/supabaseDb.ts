@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { v4 as uuidv4 } from 'uuid'
+
 import type { AppUser, Area, Report, CreateReportInput, ReportStatus, Item, ReportType, ItemCheck } from '../types'
 import { uploadImage } from './storage'
 import { compressImage } from '../utils/imageUtils'
@@ -150,7 +150,9 @@ export async function createReport(
   workerUid: string,
   onProgress?: (percent: number) => void
 ): Promise<string> {
-  const reportId = uuidv4()
+  const reportId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+  ? crypto.randomUUID()
+  : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
   const deviceId = await getDeviceFingerprint()
 
   // Fetch item to get areaId for area name lookup
@@ -437,7 +439,9 @@ export async function createMonthlyReport(
   workerUid: string,
   onProgress?: (percent: number) => void
 ): Promise<string> {
-  const reportId = uuidv4()
+  const reportId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+  ? crypto.randomUUID()
+  : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
   const deviceId = await getDeviceFingerprint()
 
   const item = await getMonthlyItem(input.areaId)
@@ -504,7 +508,9 @@ export async function createWeeklyReport(
   workerUid: string,
   onProgress?: (percent: number) => void
 ): Promise<string> {
-  const reportId = uuidv4()
+  const reportId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+  ? crypto.randomUUID()
+  : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
   const deviceId = await getDeviceFingerprint()
 
   const item = await getWeeklyItem(input.areaId)
