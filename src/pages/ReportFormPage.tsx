@@ -775,7 +775,7 @@ export default function ReportFormPage() {
           <img
             src={scanItem.examplePhotoUrl}
             alt="Example reference"
-            className="w-full max-h-48 object-cover rounded-xl"
+            className="w-full max-h-64 object-contain rounded-xl"
           />
         </div>
       )}
