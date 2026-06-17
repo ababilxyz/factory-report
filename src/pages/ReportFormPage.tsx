@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-  import { createReport, createWeeklyReport, createMonthlyReport, getChecksByItemId, getItem, getWeeklyItem, getWeeklyChecksByItemId, getMonthlyItem, getMonthlyChecksByItemId } from "../lib/supabaseDb";
+import { createReport, createWeeklyReport, createMonthlyReport, getChecksByItemId, getItem, getWeeklyItem, getWeeklyChecksByItemId, getMonthlyItem, getMonthlyChecksByItemId } from "../lib/supabaseDb";
 import { openCameraCapture, compressImage } from "../utils/imageUtils";
 import { uploadImage } from "../lib/storage";
 import type { ScanResult, ChecklistData, Item, CheckItem } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
+import { Upload } from "lucide-react";
 
 // Helper function to generate check ID with format "label(code)"
 function generateCheckId(label: string, code: string, index: number): string {
@@ -1170,7 +1171,7 @@ export default function ReportFormPage() {
           }}
           onClick={() => void handleSubmit()}
           disabled={submitting}
-          className="w-full bg-factory-accent hover:bg-factory-accent-light disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl py-4 transition-colors min-h-[52px] flex items-center justify-center gap-2"
+          className="w-full bg-[#2dd4bf] hover:bg-[#14b8a6] disabled:opacity-40 disabled:cursor-not-allowed text-gray-900 font-extrabold rounded-xl py-4 transition-colors min-h-[52px] flex items-center justify-center gap-2 tracking-wider uppercase text-sm"
         >
           {submitting ? (
             <>
@@ -1196,7 +1197,10 @@ export default function ReportFormPage() {
               Submitting...
             </>
           ) : (
-            "Submit Report"
+            <>
+              <Upload className="w-4 h-4" />
+              Submit Report
+            </>
           )}
         </motion.button>
       </div>

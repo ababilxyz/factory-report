@@ -168,28 +168,28 @@ export default function WorkerHomePage() {
         </motion.button>
 
         {/* Stats */}
-        <div className='w-full max-w-sm grid grid-cols-3 gap-3'>
-          <div className='bg-[#0f172a] border border-[#1e293b] rounded-2xl p-4 flex flex-col items-center gap-2'>
-            <span className='text-[#f1f5f9] text-2xl font-bold'>
+        <div className='w-full max-w-xs grid grid-cols-3 gap-2'>
+          <div className='bg-[#0f172a] border border-[#1e293b] rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 text-center min-h-[88px]'>
+            <span className='text-[#f1f5f9] text-xl font-bold'>
               {loading ? '-' : openCount}
             </span>
-            <span className='text-[#64748b] text-[10px] uppercase tracking-wider font-medium'>
+            <span className='text-[#64748b] text-[9px] uppercase tracking-wider font-medium whitespace-nowrap'>
               Open
             </span>
           </div>
-          <div className='bg-[#0f172a] border border-[#1e293b] rounded-2xl p-4 flex flex-col items-center gap-2'>
-            <span className='text-[#f59e0b] text-2xl font-bold'>
+          <div className='bg-[#0f172a] border border-[#1e293b] rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 text-center min-h-[88px]'>
+            <span className='text-[#f59e0b] text-xl font-bold'>
               {loading ? '-' : inProgressCount}
             </span>
-            <span className='text-[#64748b] text-[10px] uppercase tracking-wider font-medium'>
+            <span className='text-[#64748b] text-[9px] uppercase tracking-wider font-medium whitespace-nowrap'>
               In Progress
             </span>
           </div>
-          <div className='bg-[#0f172a] border border-[#1e293b] rounded-2xl p-4 flex flex-col items-center gap-2'>
-            <span className='text-[#10b981] text-2xl font-bold'>
+          <div className='bg-[#0f172a] border border-[#1e293b] rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 text-center min-h-[88px]'>
+            <span className='text-[#10b981] text-xl font-bold'>
               {loading ? '-' : resolvedCount}
             </span>
-            <span className='text-[#64748b] text-[10px] uppercase tracking-wider font-medium'>
+            <span className='text-[#64748b] text-[9px] uppercase tracking-wider font-medium whitespace-nowrap'>
               Resolved
             </span>
           </div>
