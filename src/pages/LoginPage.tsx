@@ -63,17 +63,6 @@ export default function LoginPage() {
 
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-3">
-            <svg className="w-4 h-4 text-[#64748b]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2 12h4l3-9 4 18 3-9h6" />
-            </svg>
-            <p className="text-[#64748b] text-xs tracking-[0.2em] uppercase font-medium">
-              Factory OS · V4.1
-            </p>
-            <svg className="w-4 h-4 text-[#64748b]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2 12h4l3-9 4 18 3-9h6" />
-            </svg>
-          </div>
           <h1 className="text-white text-2xl font-bold tracking-wide uppercase">
             Secure Access
           </h1>
