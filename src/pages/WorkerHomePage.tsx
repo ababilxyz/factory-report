@@ -216,7 +216,7 @@ export default function WorkerHomePage() {
               </div>
             ) : recentIssues.length === 0 ? (
               <div className='text-center py-10'>
-                <p className='text-[#64748b] text-sm'>No active issues1</p>
+                <p className='text-[#64748b] text-sm'>No active issues2</p>
                 <p className='text-[#475569] text-xs mt-1'>Scan a QR code to start reporting</p>
               </div>
             ) : (
