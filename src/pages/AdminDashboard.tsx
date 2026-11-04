@@ -16,6 +16,9 @@ import {
 import type { Report, ReportStatus, Area, Item, ChecklistData } from "../types"
 import { motion, AnimatePresence } from "framer-motion"
 import AdminScheduleManager from "../components/AdminScheduleManager"
+import AdminScheduleDesktop from "../components/AdminScheduleDesktop"
+import AdminSummaryDesktop from "../components/AdminSummaryDesktop"
+import { getScheduleForMonth } from "../lib/supabaseDb"
 import { reportStatusTone } from "../lib/reportStatus"
 
 // ==================
@@ -129,6 +132,17 @@ export default function AdminDashboard() {
   const { data: areas = [] } = useQuery({
     queryKey: ["areas"],
     queryFn: getAllAreas,
+  })
+
+  const currentYearMonth = useMemo(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+  }, [])
+  const scheduleMonth = currentYearMonth
+
+  const { data: scheduleSlots = [] } = useQuery({
+    queryKey: ["schedules", scheduleMonth],
+    queryFn: () => getScheduleForMonth(scheduleMonth),
   })
 
   const { data: dailyItemsByArea = {} } = useQuery({
@@ -332,7 +346,71 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <main className="w-full max-w-3xl mx-auto px-4 py-5 space-y-5">
+      {/* ================== Desktop Layout (>= 1024px) ================== */}
+      <div className="hidden lg:flex min-h-[calc(100vh-73px)]">
+        {/* Left Sidebar */}
+        <aside className="w-[232px] shrink-0 border-r border-[#2F3238] bg-[#222429] p-4 flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 px-2 py-1">
+              <div className="w-9 h-9 rounded-[10px] bg-[#F4F5F7] flex items-center justify-center font-extrabold text-sm text-[#121417]">
+                3P
+              </div>
+              <div>
+                <p className="text-sm font-bold text-[#F4F5F7] leading-tight">3PilarAA</p>
+                <p className="text-[10px] text-[#8E929B]">Inspeksi 4S</p>
+              </div>
+            </div>
+
+            <nav className="space-y-1">
+              {[
+                ["reports", "Ringkasan"],
+                ["schedule", "Jadwal"],
+              ].map(([key, label]) => {
+                const active = activeTab === key
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setActiveTab(key as "reports" | "schedule")}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-[10px] text-xs transition-colors ${
+                      active
+                        ? "bg-[#1B1D22] text-[#F4F5F7] font-bold border border-[#2F3238]"
+                        : "text-[#A8AEBC] hover:text-[#F4F5F7]"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </nav>
+          </div>
+
+          <div className="border-t border-[#2F3238] pt-4 px-2">
+            <p className="text-xs font-semibold text-[#F4F5F7] truncate">
+              {appUser?.displayName || "Super Admin"}
+            </p>
+            <p className="text-[10px] text-[#8E929B] mt-0.5">Administrator</p>
+          </div>
+        </aside>
+
+        {/* Content Area */}
+        <div className="flex-1 min-w-0 p-8">
+          {activeTab === "schedule" ? (
+            <AdminScheduleDesktop
+              yearMonth={scheduleMonth}
+              slots={scheduleSlots}
+              reports={reports}
+              areas={areas}
+              onOpenReport={(r) => setSelectedReport(r)}
+            />
+          ) : (
+            <AdminSummaryDesktop reports={reports} slots={scheduleSlots} />
+          )}
+        </div>
+      </div>
+
+      {/* ================== Mobile Layout (< 1024px) ================== */}
+      <main className="lg:hidden w-full max-w-3xl mx-auto px-4 py-5 space-y-5">
         {/* ================== Top View Tabs ================== */}
         <div className="flex rounded-xl border border-white/10 bg-white/5 p-1">
           <button
