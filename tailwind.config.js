@@ -5,15 +5,19 @@ export default {
     extend: {
       colors: {
         factory: {
-          dark: '#0f172a',
-          card: '#1e293b',
-          border: '#334155',
-          accent: '#0d9488',
-          'accent-light': '#14b8a6',
-          success: '#10b981',
-          warning: '#f59e0b',
-          danger: '#ef4444',
-          muted: '#94a3b8'
+          dark: '#18191C',
+          surface: '#222429',
+          card: '#222429',
+          inset: '#1B1D22',
+          border: '#2F3238',
+          accent: '#F4F5F7',
+          'accent-light': '#DCDDE1',
+          text: '#F4F5F7',
+          muted: '#8E929B',
+          dim: '#A8AEBC',
+          success: '#F4F5F7',
+          warning: '#A8AEBC',
+          danger: '#C4623F'
         }
       },
       fontFamily: {

@@ -47,8 +47,8 @@ export default function QrGeneratorPage() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[#0f172a] text-slate-100">
-      <header className="border-b border-white/10 bg-[#0f172a]/80">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[#18191C] text-[#F4F5F7]">
+      <header className="border-b border-white/10 bg-[#18191C]/90">
         <div className="max-w-3xl mx-auto px-5 py-4 flex items-center gap-4">
           <button
             onClick={() => (selectedItem ? setSelectedItem(null) : navigate(-1))}
@@ -66,7 +66,7 @@ export default function QrGeneratorPage() {
 
       <main className="max-w-3xl mx-auto px-4 py-5 space-y-4">
         <section className="flex items-center justify-between">
-          <h2 className="text-sm text-slate-400">Report type</h2>
+          <h2 className="text-sm text-[#A8AEBC]">Report type</h2>
           <div className="flex rounded-full border border-white/10 overflow-hidden">
             <button
               onClick={() => {
@@ -76,8 +76,8 @@ export default function QrGeneratorPage() {
               }}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 reportMode === 'daily'
-                  ? 'bg-[#0d9488] text-white'
-                  : 'text-slate-300 hover:bg-white/5'
+                  ? 'bg-[#F4F5F7] text-white'
+                  : 'text-[#DCDDE1] hover:bg-white/5'
               }`}
             >
               Daily
@@ -90,8 +90,8 @@ export default function QrGeneratorPage() {
               }}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 reportMode === 'weekly'
-                  ? 'bg-[#0d9488] text-white'
-                  : 'text-slate-300 hover:bg-white/5'
+                  ? 'bg-[#F4F5F7] text-white'
+                  : 'text-[#DCDDE1] hover:bg-white/5'
               }`}
             >
               Weekly
@@ -104,8 +104,8 @@ export default function QrGeneratorPage() {
               }}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 reportMode === 'monthly'
-                  ? 'bg-[#0d9488] text-white'
-                  : 'text-slate-300 hover:bg-white/5'
+                  ? 'bg-[#F4F5F7] text-white'
+                  : 'text-[#DCDDE1] hover:bg-white/5'
               }`}
             >
               Monthly
@@ -115,13 +115,13 @@ export default function QrGeneratorPage() {
 
         {!selectedItem && (
           <section className="space-y-3">
-            <h2 className="text-sm text-slate-400">Select area</h2>
+            <h2 className="text-sm text-[#A8AEBC]">Select area</h2>
             {areasLoading ? (
               <div className="flex justify-center py-12">
-                <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-[#0d9488] animate-spin" />
+                <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-[#F4F5F7] animate-spin" />
               </div>
             ) : areas.length === 0 ? (
-              <p className="text-sm text-slate-500">No areas found.</p>
+              <p className="text-sm text-[#8E929B]">No areas found.</p>
             ) : (
               <div className="space-y-2">
                 {areas.map((area) => (
@@ -130,12 +130,12 @@ export default function QrGeneratorPage() {
                     onClick={() => setSelectedArea(area)}
                     className={`w-full text-left rounded-xl border px-4 py-3 transition-colors ${
                       selectedArea?.areaId === area.areaId
-                        ? 'border-[#0d9488] bg-[#0d9488]/10'
+                        ? 'border-[#F4F5F7] bg-[#F4F5F7]/10'
                         : 'border-white/10 bg-white/5 hover:border-white/20'
                     }`}
                   >
                     <p className="text-sm font-medium">{area.name}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{area.areaId}</p>
+                    <p className="text-xs text-[#8E929B] mt-0.5">{area.areaId}</p>
                   </button>
                 ))}
               </div>
@@ -145,7 +145,7 @@ export default function QrGeneratorPage() {
 
         {selectedArea && !selectedItem && (
           <section className="space-y-3">
-            <h2 className="text-sm text-slate-400">
+            <h2 className="text-sm text-[#A8AEBC]">
               {reportMode === 'weekly'
                 ? `Weekly items in ${selectedArea.name}`
                 : reportMode === 'monthly'
@@ -154,10 +154,10 @@ export default function QrGeneratorPage() {
             </h2>
             {itemsLoading ? (
               <div className="flex justify-center py-12">
-                <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-[#0d9488] animate-spin" />
+                <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-[#F4F5F7] animate-spin" />
               </div>
             ) : items.length === 0 ? (
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-[#8E929B]">
                   {reportMode === 'weekly'
                     ? 'No weekly items in this area.'
                     : reportMode === 'monthly'
@@ -170,20 +170,20 @@ export default function QrGeneratorPage() {
                   <button
                     key={item.id}
                     onClick={() => generateQr(item, selectedArea)}
-                    className="w-full text-left rounded-xl border border-white/10 bg-white/5 px-4 py-3 hover:border-[#0d9488]/60 transition-colors"
+                    className="w-full text-left rounded-xl border border-white/10 bg-white/5 px-4 py-3 hover:border-[#F4F5F7]/60 transition-colors"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-medium">{item.name}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{item.code}</p>
+                        <p className="text-xs text-[#8E929B] mt-0.5">{item.code}</p>
                       </div>
                       {reportMode === 'weekly' && (
-                        <span className="text-[11px] px-2 py-0.5 rounded-full border border-white/10 text-slate-200">
+                        <span className="text-[11px] px-2 py-0.5 rounded-full border border-white/10 text-[#F4F5F7]">
                           Weekly
                         </span>
                       )}
                       {reportMode === 'monthly' && (
-                        <span className="text-[11px] px-2 py-0.5 rounded-full border border-white/10 text-slate-200">
+                        <span className="text-[11px] px-2 py-0.5 rounded-full border border-white/10 text-[#F4F5F7]">
                           Monthly
                         </span>
                       )}
@@ -205,12 +205,12 @@ export default function QrGeneratorPage() {
             >
               <QRCodeSVG value={generatedPayload} size={220} level="M" includeMargin />
               <div>
-                <p className="text-sm font-semibold text-slate-900">{selectedItem.name}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{selectedItem.code}</p>
+                <p className="text-sm font-semibold text-[#121417]">{selectedItem.name}</p>
+                <p className="text-xs text-[#8E929B] mt-0.5">{selectedItem.code}</p>
               </div>
               <button
                 onClick={() => window.print()}
-                className="rounded-xl bg-[#0f172a] text-white text-sm font-medium px-4 py-2.5 hover:bg-[#0f172a]/90 transition-colors"
+                className="rounded-xl bg-[#222429] text-white text-sm font-medium px-4 py-2.5 hover:bg-[#222429]/90 transition-colors"
               >
                 Print QR
               </button>

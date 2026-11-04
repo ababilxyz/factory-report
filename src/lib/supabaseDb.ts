@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 
-import type { AppUser, Area, Report, CreateReportInput, ReportStatus, Item, ReportType, ItemCheck } from '../types'
+import type { AppUser, Area, Report, CreateReportInput, ReportStatus, Item, ReportType, ItemCheck, ScheduleSlot } from '../types'
 import { uploadImage } from './storage'
 import { compressImage } from '../utils/imageUtils'
 import { getDeviceFingerprint } from '../utils/deviceFingerprint'
@@ -663,6 +663,196 @@ export async function getMonthlyReports(monthStart: number): Promise<Report[]> {
     monthStart: d.month_start,
     checklistData: d.checklist_data
   })) as Report[]
+}
+
+// ==================
+// 4S Schedules
+// ==================
+export async function getScheduleForDay(
+  workerUid: string,
+  yearMonth: string,
+  dayOfMonth: number
+): Promise<ScheduleSlot[]> {
+  const { data, error } = await supabase
+    .from('schedules')
+    .select('*')
+    .eq('year_month', yearMonth)
+    .eq('day_of_month', dayOfMonth)
+    .eq('pic_uid', workerUid)
+    .order('duration_minutes', { ascending: true })
+
+  if (error) throw error
+  return (data || []).map(mapScheduleSlot)
+}
+
+export async function getScheduleForMonth(
+  yearMonth: string,
+  areaId?: string
+): Promise<ScheduleSlot[]> {
+  let query = supabase
+    .from('schedules')
+    .select('*')
+    .eq('year_month', yearMonth)
+    .order('day_of_month', { ascending: true })
+    .order('item_code', { ascending: true })
+
+  if (areaId) {
+    query = query.eq('area_id', areaId)
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+  return (data || []).map(mapScheduleSlot)
+}
+
+export async function replaceMonthSchedule(
+  yearMonth: string,
+  slots: Array<Omit<ScheduleSlot, 'scheduleId'>>
+): Promise<number> {
+  const { error: delError } = await supabase
+    .from('schedules')
+    .delete()
+    .eq('year_month', yearMonth)
+
+  if (delError) throw delError
+  if (slots.length === 0) return 0
+
+  const payload = slots.map((s) => ({
+    year_month: s.yearMonth,
+    day_of_month: s.dayOfMonth,
+    item_id: s.itemId,
+    item_code: s.itemCode,
+    item_name: s.itemName,
+    area_id: s.areaId,
+    report_type: s.reportType,
+    duration_minutes: s.durationMinutes,
+    pic_name_raw: s.picNameRaw,
+    pic_uid: s.picUid ?? null,
+    source: s.source || 'excel'
+  }))
+
+  // Chunk insert to stay safely below payload limits
+  for (let i = 0; i < payload.length; i += 200) {
+    const chunk = payload.slice(i, i + 200)
+    const { error: insError } = await supabase.from('schedules').insert(chunk)
+    if (insError) throw insError
+  }
+  return slots.length
+}
+
+export async function updateSchedulePic(
+  scheduleId: string,
+  picNameRaw: string,
+  picUid: string | null
+): Promise<void> {
+  const { error } = await supabase
+    .from('schedules')
+    .update({
+      pic_name_raw: picNameRaw,
+      pic_uid: picUid,
+      updated_at: new Date().toISOString()
+    })
+    .eq('schedule_id', scheduleId)
+
+  if (error) throw error
+}
+
+export async function deleteScheduleSlot(scheduleId: string): Promise<void> {
+  const { error } = await supabase
+    .from('schedules')
+    .delete()
+    .eq('schedule_id', scheduleId)
+
+  if (error) throw error
+}
+
+export async function addScheduleSlot(
+  slot: Omit<ScheduleSlot, 'scheduleId'>
+): Promise<void> {
+  // Idempotent replace if slot exists for same day & item
+  await supabase
+    .from('schedules')
+    .delete()
+    .eq('year_month', slot.yearMonth)
+    .eq('day_of_month', slot.dayOfMonth)
+    .eq('item_id', slot.itemId)
+
+  const { error } = await supabase.from('schedules').insert({
+    year_month: slot.yearMonth,
+    day_of_month: slot.dayOfMonth,
+    item_id: slot.itemId,
+    item_code: slot.itemCode,
+    item_name: slot.itemName,
+    area_id: slot.areaId,
+    report_type: slot.reportType,
+    duration_minutes: slot.durationMinutes,
+    pic_name_raw: slot.picNameRaw,
+    pic_uid: slot.picUid ?? null,
+    source: 'manual'
+  })
+
+  if (error) throw error
+}
+
+export async function getAssignableWorkers(): Promise<AppUser[]> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('role', 'worker')
+    .order('display_name', { ascending: true })
+
+  if (error) throw error
+  return (data || []).map((d: any) => ({
+    uid: d.uid,
+    email: d.email,
+    role: d.role,
+    displayName: d.display_name,
+    createdAt: d.created_at
+  }))
+}
+
+export async function getAllMasterItems(): Promise<Item[]> {
+  const [daily, weekly, monthly] = await Promise.all([
+    supabase.from('items').select('item_id, area_id, code, name, display_order, example_photo_url'),
+    supabase.from('weekly_items').select('item_id, area_id, code, name, display_order, example_photo_url'),
+    supabase.from('monthly_items').select('item_id, area_id, code, name, display_order, example_photo_url')
+  ])
+  const out: Item[] = []
+  const add = (rows: any[] | null, type: ReportType) => {
+    for (const d of rows || []) {
+      out.push({
+        id: d.item_id,
+        areaId: d.area_id,
+        code: d.code,
+        name: d.name,
+        order: d.display_order ?? 0,
+        checks: [],
+        examplePhotoUrl: d.example_photo_url,
+        reportType: type
+      })
+    }
+  }
+  add(daily.data, 'daily')
+  add(weekly.data, 'weekly')
+  add(monthly.data, 'monthly')
+  return out
+}
+
+function mapScheduleSlot(d: any): ScheduleSlot {
+  return {
+    scheduleId: d.schedule_id,
+    yearMonth: d.year_month,
+    dayOfMonth: d.day_of_month,
+    itemId: d.item_id,
+    itemCode: d.item_code,
+    itemName: d.item_name,
+    areaId: d.area_id,
+    reportType: d.report_type,
+    durationMinutes: d.duration_minutes ?? 10,
+    picNameRaw: d.pic_name_raw,
+    picUid: d.pic_uid,
+    source: d.source || 'excel'
+  }
 }
 
 export async function getMonthlyReportsByWorkerId(workerUid: string, monthStart: number): Promise<Report[]> {

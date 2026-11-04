@@ -164,3 +164,30 @@ export interface GpsCoordinates {
   lng: number
   accuracy: number
 }
+
+// ==================
+// 4S Schedule Types
+// ==================
+export interface ScheduleSlot {
+  scheduleId: string
+  yearMonth: string
+  dayOfMonth: number
+  itemId: string
+  itemCode: string
+  itemName: string
+  areaId: string
+  reportType: ReportType
+  durationMinutes: number
+  picNameRaw: string
+  picUid?: string | null
+  source?: 'excel' | 'manual'
+}
+
+export interface ParsedScheduleRow {
+  itemCode: string
+  itemName: string
+  reportType: ReportType
+  durationMinutes: number
+  picRaw: string
+  days: number[]
+}

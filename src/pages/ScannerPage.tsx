@@ -42,7 +42,7 @@ export default function ScannerPage() {
           </svg>
         </button>
         <div className='flex items-center gap-2'>
-          <div className='w-8 h-8 rounded-lg bg-[#0d9488] flex items-center justify-center text-white'>
+          <div className='w-8 h-8 rounded-lg bg-[#F4F5F7] flex items-center justify-center text-white'>
             <svg className='w-5 h-5' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
               <path strokeLinecap='round' strokeLinejoin='round' d='M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21' />
             </svg>
@@ -98,14 +98,14 @@ export default function ScannerPage() {
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-              className="w-20 h-20 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center"
+              className="w-20 h-20 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center"
             >
-              <svg className="w-10 h-10 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-10 h-10 text-[#F4F5F7]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </motion.div>
             <div className="text-center">
-              <p className="text-green-400 font-semibold text-lg">Area Verified</p>
+              <p className="text-[#F4F5F7] font-semibold text-lg">Area Verified</p>
               <p className="text-white text-xl font-bold mt-1">{result.areaName}</p>
               <p className="text-white/50 text-sm mt-2">Redirecting to report form...</p>
             </div>
@@ -122,14 +122,14 @@ export default function ScannerPage() {
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: 'spring', stiffness: 250 }}
-              className="w-20 h-20 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center"
+              className="w-20 h-20 rounded-full bg-[#C4623F]/20 border-2 border-[#C4623F]/60 flex items-center justify-center"
             >
-              <svg className="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-10 h-10 text-[#E08462]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </motion.div>
             <div className="text-center">
-              <p className="text-red-400 font-semibold">
+              <p className="text-[#E08462] font-semibold">
                 {error.code === 'LOCATION_MISMATCH' ? 'Wrong Location' :
                  error.code === 'PERMISSION_DENIED' ? 'Permission Denied' :
                  'Scan Failed'}

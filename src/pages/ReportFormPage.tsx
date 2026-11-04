@@ -117,31 +117,12 @@ function getOptionButtonStyle(
 
   switch (status) {
     case "positive":
-      return "bg-green-900/50 text-green-300 border border-green-800";
+      return "bg-white/10 text-[#F4F5F7] border border-white/15";
     case "neutral":
-      return "bg-yellow-900/50 text-yellow-300 border border-yellow-800";
+      return "bg-[#A8AEBC]/10 text-[#A8AEBC] border border-[#A8AEBC]/40";
     case "negative":
-      return "bg-red-900/50 text-red-300 border border-red-800";
+      return "bg-[#C4623F]/15 text-[#E08462] border border-[#C4623F]/60";
   }
-}
-
-// Get after photo button style based on status
-function getAfterPhotoButtonStyle(
-  hasAfterPhoto: boolean,
-  status: "positive" | "neutral" | "negative",
-) {
-  const baseStyle = hasAfterPhoto
-    ? "bg-green-900/50 text-green-300 border border-green-800"
-    : "bg-factory-accent/20 hover:bg-factory-accent/30 text-factory-accent";
-
-  // For pending status, show orange
-  if (status === "neutral") {
-    return hasAfterPhoto
-      ? "bg-yellow-900/50 text-yellow-300 border border-yellow-800"
-      : "bg-factory-accent/20 hover:bg-factory-accent/30 text-factory-accent";
-  }
-
-  return baseStyle;
 }
 
 export default function ReportFormPage() {
@@ -165,9 +146,6 @@ export default function ReportFormPage() {
         item.checks.forEach((check) => {
           if (check.issuePhotoPreview) {
             URL.revokeObjectURL(check.issuePhotoPreview);
-          }
-          if (check.afterPhotoPreview) {
-            URL.revokeObjectURL(check.afterPhotoPreview);
           }
         });
       });
@@ -193,9 +171,6 @@ export default function ReportFormPage() {
   const pendingEvidenceUploads = useRef<
     Map<string, { photoFile: File; description: string }>
   >(new Map());
-  // Track pending after photo uploads
-  const pendingAfterUploads = useRef<Map<string, File>>(new Map());
-
   // Redirect if no scan result
   useEffect(() => {
     if (!scanResult) navigate("/home", { replace: true });
@@ -253,61 +228,6 @@ export default function ReportFormPage() {
         setSubmitError("Could not access camera. " + err.message);
       }
     }
-  }
-
-  // Handle taking after photo for check item (fix/cleanup)
-  async function handleTakeAfterPhoto(itemId: string, checkId: string) {
-    try {
-      const file = await openCameraCapture();
-
-      // Store in pending uploads map
-      pendingAfterUploads.current.set(checkId, file);
-
-      // Create preview URL
-      const url = URL.createObjectURL(file);
-
-      // Update checklist with preview
-      setChecklistData((prev) => {
-        const newItems = { ...prev.items };
-        if (newItems[itemId]) {
-          newItems[itemId] = {
-            ...newItems[itemId],
-            checks: newItems[itemId].checks.map((check) =>
-              check.id === checkId
-                ? { ...check, afterPhotoPreview: url, afterPhotoFile: file }
-                : check,
-            ),
-          };
-        }
-        return { ...prev, items: newItems };
-      });
-    } catch (err) {
-      if (err instanceof Error && err.message !== "Camera cancelled") {
-        setSubmitError("Could not access camera. " + err.message);
-      }
-    }
-  }
-
-  // Handle after photo description change
-  function handleAfterDescription(
-    itemId: string,
-    checkId: string,
-    desc: string,
-  ) {
-    setChecklistData((prev) => {
-      const newItems = { ...prev.items };
-      if (newItems[itemId]) {
-        newItems[itemId] = {
-          ...newItems[itemId],
-          checks: newItems[itemId].checks.map((check) =>
-            check.id === checkId
-              ? { ...check, afterDescription: desc }
-              : check,
-          ),
-        };
-      }
-      return { ...prev, items: newItems };
-    });
   }
 
   // Handle check description change
@@ -373,12 +293,8 @@ export default function ReportFormPage() {
             if (checkToClear?.issuePhotoPreview) {
               URL.revokeObjectURL(checkToClear.issuePhotoPreview);
             }
-            if (checkToClear?.afterPhotoPreview) {
-              URL.revokeObjectURL(checkToClear.afterPhotoPreview);
-            }
             // Remove from pending uploads
             pendingEvidenceUploads.current.delete(checkId);
-            pendingAfterUploads.current.delete(checkId);
           }
         }
 
@@ -457,59 +373,16 @@ export default function ReportFormPage() {
       return;
     }
 
-    // Validate after photo for negative/neutral selections
-    const missingAfterPhoto = Object.values(checklistData.items).flatMap(
-      (item) =>
-        item.checks
-          .filter(
-            (check) =>
-              check.selectedOption &&
-              requiresEvidence(check.selectedOption, check.options),
-          )
-          .filter(
-            (check) =>
-              !check.afterPhotoFile &&
-              !pendingAfterUploads.current.has(check.id),
-          )
-          .map((check) => check.label),
-    );
-    if (missingAfterPhoto.length > 0) {
-      setSubmitError(
-        `After photo (fix) required for: ${missingAfterPhoto.join(", ")}`,
-      );
-      return;
-    }
-
-    // Validate after description for negative/neutral selections
-    const missingAfterDescription = Object.values(checklistData.items).flatMap(
-      (item) =>
-        item.checks
-          .filter(
-            (check) =>
-              check.selectedOption &&
-              requiresEvidence(check.selectedOption, check.options),
-          )
-          .filter((check) => !check.afterDescription?.trim())
-          .map((check) => check.label),
-    );
-    if (missingAfterDescription.length > 0) {
-      setSubmitError(
-        `Action description required for: ${missingAfterDescription.join(", ")}`,
-      );
-      return;
-    }
-
     setSubmitError("");
     setSubmitting(true);
     setUploadProgress(0);
 
     try {
-      // Collect all evidence photos to upload (issue photos + after photos)
+      // Collect evidence photos to upload (issue photos only)
       const evidenceToUpload: Array<{
         checkId: string;
         photoFile: File;
         description: string;
-        type: "issue" | "after";
       }> = [];
 
       // Get issue photos from pending uploads map
@@ -518,7 +391,6 @@ export default function ReportFormPage() {
           checkId,
           photoFile: evidence.photoFile,
           description: evidence.description,
-          type: "issue",
         });
       }
 
@@ -533,37 +405,6 @@ export default function ReportFormPage() {
               checkId: check.id,
               photoFile: check.issuePhotoFile,
               description: check.issueDescription || "",
-              type: "issue",
-            });
-          }
-        }
-      }
-
-      // Get after photos from pending uploads map
-      for (const [checkId, photoFile] of pendingAfterUploads.current) {
-        const checkDesc = Object.values(checklistData.items)
-          .flatMap((item) => item.checks)
-          .find((c) => c.id === checkId)?.afterDescription || "";
-        evidenceToUpload.push({
-          checkId,
-          photoFile,
-          description: checkDesc,
-          type: "after",
-        });
-      }
-
-      // Also check checklist items for existing after photo files not yet in pending
-      for (const item of Object.values(checklistData.items)) {
-        for (const check of item.checks) {
-          if (
-            check.afterPhotoFile &&
-            !pendingAfterUploads.current.has(check.id)
-          ) {
-            evidenceToUpload.push({
-              checkId: check.id,
-              photoFile: check.afterPhotoFile,
-              description: check.afterDescription || "",
-              type: "after",
             });
           }
         }
@@ -573,18 +414,13 @@ export default function ReportFormPage() {
       let uploaded = 0;
 
       const uploadedIssuePhotos = new Map<string, string>();
-      const uploadedAfterPhotos = new Map<string, string>();
 
       // Upload all photos
       for (const evidence of evidenceToUpload) {
         const compressed = await compressImage(evidence.photoFile);
         const result = await uploadImage(compressed);
 
-        if (evidence.type === "issue") {
-          uploadedIssuePhotos.set(evidence.checkId, result.url);
-        } else {
-          uploadedAfterPhotos.set(evidence.checkId, result.url);
-        }
+        uploadedIssuePhotos.set(evidence.checkId, result.url);
 
         uploaded++;
         setUploadProgress(Math.round((uploaded / totalPending) * 100));
@@ -606,24 +442,6 @@ export default function ReportFormPage() {
             finalChecklist.items[itemId].checks[
               checkIndex
             ].issuePhotoPreview = undefined;
-            break;
-          }
-        }
-      }
-
-      // Apply uploaded after photo URLs
-      for (const [checkId, url] of uploadedAfterPhotos) {
-        for (const itemId in finalChecklist.items) {
-          const checkIndex = finalChecklist.items[itemId].checks.findIndex(
-            (c: any) => c.id === checkId,
-          );
-          if (checkIndex !== -1) {
-            finalChecklist.items[itemId].checks[checkIndex].afterPhotoUrl = url;
-            finalChecklist.items[itemId].checks[checkIndex].afterPhotoFile =
-              undefined;
-            finalChecklist.items[itemId].checks[
-              checkIndex
-            ].afterPhotoPreview = undefined;
             break;
           }
         }
@@ -693,10 +511,10 @@ export default function ReportFormPage() {
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: "spring", stiffness: 200 }}
-          className="w-24 h-24 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center"
+          className="w-24 h-24 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center"
         >
           <svg
-            className="w-12 h-12 text-green-400"
+            className="w-12 h-12 text-[#F4F5F7]"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -720,7 +538,7 @@ export default function ReportFormPage() {
           onClick={() => navigate("/home")}
           className="bg-factory-accent text-white px-8 py-3.5 rounded-xl font-semibold min-h-[44px]"
         >
-          Back to Home
+          Kembali ke Beranda
         </motion.button>
       </motion.div>
     );
@@ -784,7 +602,7 @@ export default function ReportFormPage() {
         {/* Checklist Section */}
         <div>
           <label className="block text-sm font-medium text-white mb-2">
-            Inspection Checklist <span className="text-red-400">*</span>
+            Inspection Checklist <span className="text-[#E08462]">*</span>
           </label>
 
           <div className="space-y-4">
@@ -808,7 +626,7 @@ export default function ReportFormPage() {
                         !isIssueOption(check.selectedOption, check.options),
                     ) ? (
                       <svg
-                        className="w-4 h-4 text-green-400"
+                        className="w-4 h-4 text-[#F4F5F7]"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -822,7 +640,7 @@ export default function ReportFormPage() {
                       </svg>
                     ) : (
                       <svg
-                        className="w-4 h-4 text-red-400"
+                        className="w-4 h-4 text-[#E08462]"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -845,9 +663,6 @@ export default function ReportFormPage() {
                       const showEvidence =
                         check.selectedOption &&
                         requiresEvidence(check.selectedOption, check.options);
-                      const optStatus = check.selectedOption
-                        ? getOptionStatus(check.selectedOption, check.options)
-                        : "positive";
 
                       return (
                         <div key={check.id} className="flex flex-col gap-2">
@@ -888,8 +703,8 @@ export default function ReportFormPage() {
                             <div className="mt-2 p-3 bg-factory-border/20 rounded-lg space-y-3">
                               {/* Issue/Before Photo capture */}
                               <div>
-                                <span className="text-xs text-red-400 block mb-1">
-                                  Foto Masalah (Before) <span className="text-red-400">*</span>
+                                <span className="text-xs text-[#E08462] block mb-1">
+                                  Foto Masalah (Before) <span className="text-[#E08462]">*</span>
                                 </span>
                                 {check.issuePhotoPreview ? (
                                   <div className="relative rounded-lg overflow-hidden bg-factory-card border border-factory-border max-w-xs">
@@ -979,7 +794,7 @@ export default function ReportFormPage() {
 
                               {/* Description */}
                               <div>
-                                <span className="text-xs text-yellow-400 block mb-1">
+                                <span className="text-xs text-[#A8AEBC] block mb-1">
                                   Deskripsikan Masalah
                                 </span>
                                 <textarea
@@ -994,125 +809,10 @@ export default function ReportFormPage() {
                                   rows={2}
                                   maxLength={300}
                                   placeholder="Deskripsikan masalah..."
-                                  className="w-full bg-factory-card border border-factory-border rounded-lg px-3 py-2 text-white placeholder-factory-muted focus:outline-none focus:border-yellow-500 transition-colors resize-none text-xs"
+                                  className="w-full bg-factory-card border border-factory-border rounded-lg px-3 py-2 text-white placeholder-factory-muted focus:outline-none focus:border-[#A8AEBC]/40 transition-colors resize-none text-xs"
                                 />
                               </div>
 
-                              {/* After/Fix Photo capture - required for issues */}
-                              <div>
-                                <span className="text-xs text-green-400 block mb-1">
-                                  Ambil Foto Setelah Tindakan <span className="text-red-400">*</span>
-                                </span>
-                                {check.afterPhotoPreview ? (
-                                  <div className="relative rounded-lg overflow-hidden bg-factory-card border border-factory-border max-w-xs">
-                                    <img
-                                      src={check.afterPhotoPreview}
-                                      alt="After"
-                                      className="w-full max-h-32 object-cover"
-                                    />
-                                    <button
-                                      onClick={() => {
-                                        setChecklistData((prev) => {
-                                          const newItems = { ...prev.items };
-                                          if (newItems[item.id]) {
-                                            newItems[item.id] = {
-                                              ...newItems[item.id],
-                                              checks: newItems[
-                                                item.id
-                                              ].checks.map((c) =>
-                                                c.id === check.id
-                                                  ? {
-                                                      ...c,
-                                                      afterPhotoPreview:
-                                                        undefined,
-                                                      afterPhotoFile: undefined,
-                                                      afterPhotoUrl: undefined,
-                                                      afterDescription: undefined,
-                                                    }
-                                                  : c,
-                                              ),
-                                            };
-                                          }
-                                          return { ...prev, items: newItems };
-                                        });
-                                        pendingAfterUploads.current.delete(
-                                          check.id,
-                                        );
-                                      }}
-                                      className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded"
-                                    >
-                                      <svg
-                                        className="w-3 h-3"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                        strokeWidth={2}
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          d="M6 18L18 6M6 6l12 12"
-                                        />
-                                      </svg>
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <motion.button
-                                    whileTap={{ scale: 0.97 }}
-                                    onClick={() =>
-                                      void handleTakeAfterPhoto(
-                                        item.id,
-                                        check.id,
-                                      )
-                                    }
-                                    className={`text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 min-h-[44px] ${getAfterPhotoButtonStyle(
-                                      !!check.afterPhotoUrl,
-                                      optStatus,
-                                    )}`}
-                                  >
-                                    <svg
-                                      className="w-4 h-4"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
-                                      strokeWidth={2}
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"
-                                      />
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"
-                                      />
-                                    </svg>
-                                    Ambil Foto Setelah Tindakan
-                                  </motion.button>
-                                )}
-                              </div>
-
-                              {/* Action description - required for issues */}
-                              <div>
-                                <span className="text-xs text-green-400 block mb-1">
-                                  Deskripsi Tindakan yang Dilakukan <span className="text-red-400">*</span>
-                                </span>
-                                <textarea
-                                  value={check.afterDescription || ""}
-                                  onChange={(e) =>
-                                    handleAfterDescription(
-                                      item.id,
-                                      check.id,
-                                      e.target.value,
-                                    )
-                                  }
-                                  rows={2}
-                                  maxLength={300}
-                                  placeholder="Jelaskan tindakan yang dilakukan..."
-                                  className="w-full bg-factory-card border border-factory-border rounded-lg px-3 py-2 text-white placeholder-factory-muted focus:outline-none focus:border-green-500 transition-colors resize-none text-xs"
-                                />
-                              </div>
                             </div>
                           )}
                         </div>
@@ -1131,7 +831,7 @@ export default function ReportFormPage() {
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0 }}
-              className="bg-red-950/50 border border-red-800 text-red-300 text-sm rounded-xl p-3"
+              className="bg-[#C4623F]/15 border border-[#C4623F]/60 text-[#E08462] text-sm rounded-xl p-3"
             >
               {submitError}
             </motion.div>
@@ -1171,7 +871,7 @@ export default function ReportFormPage() {
           }}
           onClick={() => void handleSubmit()}
           disabled={submitting}
-          className="w-full bg-[#2dd4bf] hover:bg-[#14b8a6] disabled:opacity-40 disabled:cursor-not-allowed text-gray-900 font-extrabold rounded-xl py-4 transition-colors min-h-[52px] flex items-center justify-center gap-2 tracking-wider uppercase text-sm"
+          className="w-full bg-[#F4F5F7] hover:bg-[#DCDDE1] disabled:opacity-40 disabled:cursor-not-allowed text-[#121417] font-extrabold rounded-xl py-4 transition-colors min-h-[52px] flex items-center justify-center gap-2 tracking-wider uppercase text-sm"
         >
           {submitting ? (
             <>

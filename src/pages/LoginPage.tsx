@@ -39,7 +39,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0b1121] flex items-center justify-center p-6">
+    <div className="min-h-screen bg-[#18191C] flex items-center justify-center p-6">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -54,10 +54,10 @@ export default function LoginPage() {
           className="flex justify-center mb-6"
         >
           <div className="relative">
-            <div className="w-20 h-20 rounded-2xl border-2 border-[#0d9488]/60 bg-[#0d9488]/10 flex items-center justify-center">
-              <Shield className="w-10 h-10 text-[#0d9488]" strokeWidth={1.5} />
+            <div className="w-20 h-20 rounded-2xl border-2 border-[#F4F5F7]/60 bg-[#F4F5F7]/10 flex items-center justify-center">
+              <Shield className="w-10 h-10 text-[#F4F5F7]" strokeWidth={1.5} />
             </div>
-            <div className="absolute inset-0 rounded-2xl border-2 border-[#0d9488]/30 animate-pulse" />
+            <div className="absolute inset-0 rounded-2xl border-2 border-[#F4F5F7]/30 animate-pulse" />
           </div>
         </motion.div>
 
@@ -66,7 +66,7 @@ export default function LoginPage() {
           <h1 className="text-white text-2xl font-bold tracking-wide uppercase">
             Secure Access
           </h1>
-          <p className="text-[#64748b] text-[10px] tracking-[0.15em] uppercase mt-2">
+          <p className="text-[#8E929B] text-[10px] tracking-[0.15em] uppercase mt-2">
             Encrypted · Authenticated · Validated
           </p>
         </div>
@@ -76,14 +76,14 @@ export default function LoginPage() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.4 }}
-          className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-6"
+          className="bg-[#222429] border border-[#2F3238] rounded-2xl p-6"
         >
           {/* Error */}
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-red-950/40 border border-red-900/60 text-red-300 text-xs rounded-lg px-4 py-2.5 mb-4"
+              className="bg-[#C4623F]/15 border border-[#C4623F]/40 text-[#E08462] text-xs rounded-lg px-4 py-2.5 mb-4"
             >
               {error}
             </motion.div>
@@ -92,11 +92,11 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-[10px] text-[#64748b] tracking-wider uppercase mb-1.5">
+              <label htmlFor="email" className="block text-[10px] text-[#8E929B] tracking-wider uppercase mb-1.5">
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#475569]" />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E929B]" />
                 <input
                   id="email"
                   type="email"
@@ -104,7 +104,7 @@ export default function LoginPage() {
                   onChange={e => setEmail(e.target.value)}
                   required
                   autoComplete="email"
-                  className="w-full bg-[#0b1121] border border-[#1e293b] rounded-xl pl-11 pr-4 py-3 text-white text-sm placeholder-[#475569] focus:outline-none focus:border-[#0d9488]/60 transition-colors min-h-[44px]"
+                  className="w-full bg-[#18191C] border border-[#2F3238] rounded-xl pl-11 pr-4 py-3 text-white text-sm placeholder-[#8E929B] focus:outline-none focus:border-[#F4F5F7]/60 transition-colors min-h-[44px]"
                   placeholder="operator@factory.com"
                 />
               </div>
@@ -112,11 +112,11 @@ export default function LoginPage() {
 
             {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-[10px] text-[#64748b] tracking-wider uppercase mb-1.5">
+              <label htmlFor="password" className="block text-[10px] text-[#8E929B] tracking-wider uppercase mb-1.5">
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#475569]" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E929B]" />
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
@@ -124,13 +124,13 @@ export default function LoginPage() {
                   onChange={e => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  className="w-full bg-[#0b1121] border border-[#1e293b] rounded-xl pl-11 pr-11 py-3 text-white text-sm placeholder-[#475569] focus:outline-none focus:border-[#0d9488]/60 transition-colors min-h-[44px]"
+                  className="w-full bg-[#18191C] border border-[#2F3238] rounded-xl pl-11 pr-11 py-3 text-white text-sm placeholder-[#8E929B] focus:outline-none focus:border-[#F4F5F7]/60 transition-colors min-h-[44px]"
                   placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#475569] hover:text-[#94a3b8] transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8E929B] hover:text-[#A8AEBC] transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -142,7 +142,7 @@ export default function LoginPage() {
               type="submit"
               disabled={loading}
               whileTap={{ scale: loading ? 1 : 0.97 }}
-              className="w-full bg-[#0d9488] hover:bg-[#0f766e] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl py-3.5 transition-colors min-h-[44px] flex items-center justify-center gap-2 tracking-wide uppercase text-sm"
+              className="w-full bg-[#F4F5F7] hover:bg-[#A8AEBC] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl py-3.5 transition-colors min-h-[44px] flex items-center justify-center gap-2 tracking-wide uppercase text-sm"
             >
               {loading ? (
                 <>
@@ -167,15 +167,15 @@ export default function LoginPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
-          className="mt-5 bg-[#0f172a] border border-[#1e293b] rounded-xl px-4 py-3 flex items-start gap-2.5"
+          className="mt-5 bg-[#222429] border border-[#2F3238] rounded-xl px-4 py-3 flex items-start gap-2.5"
         >
-          <Shield className="w-3.5 h-3.5 text-red-400 mt-0.5 flex-shrink-0" />
-          <p className="text-[#64748b] text-[11px] leading-relaxed">
+          <Shield className="w-3.5 h-3.5 text-[#E08462] mt-0.5 flex-shrink-0" />
+          <p className="text-[#8E929B] text-[11px] leading-relaxed">
             All sessions are encrypted and geo-validated. Unauthorized access attempts are logged and reported.
           </p>
         </motion.div>
 
-        <p className="text-center text-[#475569] text-[11px] mt-5">
+        <p className="text-center text-[#8E929B] text-[11px] mt-5">
           Need access? Contact your Team Leader.
         </p>
       </motion.div>

@@ -15,36 +15,14 @@ import {
 } from "../lib/supabaseDb"
 import type { Report, ReportStatus, Area, Item, ChecklistData } from "../types"
 import { motion, AnimatePresence } from "framer-motion"
+import AdminScheduleManager from "../components/AdminScheduleManager"
+import { reportStatusTone } from "../lib/reportStatus"
 
 // ==================
 // Helpers
 // ==================
 
-function getStatusColor(status: Report["status"]) {
-  switch (status) {
-    case "pending":
-      return "bg-amber-900/50 text-amber-300 border-amber-800"
-    case "in_progress":
-      return "bg-teal-900/50 text-teal-300 border-teal-800"
-    case "resolved":
-      return "bg-emerald-900/50 text-emerald-300 border-emerald-800"
-    default:
-      return "bg-white/10 text-white/70 border-white/20"
-  }
-}
 
-function getStatusLabel(status: Report["status"]) {
-  switch (status) {
-    case "pending":
-      return "Pending"
-    case "in_progress":
-      return "In Progress"
-    case "resolved":
-      return "Resolved"
-    default:
-      return status
-  }
-}
 
 function timeAgo(ts: number) {
   const diff = Date.now() - ts
@@ -84,6 +62,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [reportMode, setReportMode] = useState<"daily" | "weekly" | "monthly">("daily")
+  const [activeTab, setActiveTab] = useState<"reports" | "schedule">("reports")
   const [filter, setFilter] = useState<ReportStatus | "all">("all")
   const [areaFilter, setAreaFilter] = useState<string | "all">("all")
   const [selectedReport, setSelectedReport] = useState<Report | null>(null)
@@ -309,12 +288,12 @@ export default function AdminDashboard() {
         })
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100 overflow-x-hidden">
+    <div className="min-h-screen bg-[#18191C] text-[#F4F5F7] overflow-x-hidden">
       {/* ================== Header ================== */}
-      <header className="border-b border-white/10 bg-[#0f172a]/80 backdrop-blur-sm sticky top-0 z-10">
+      <header className="border-b border-white/10 bg-[#18191C]/90 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#0d9488] flex items-center justify-center text-white">
+            <div className="w-8 h-8 rounded-lg bg-[#F4F5F7] flex items-center justify-center text-white">
               <svg
                 className="w-5 h-5"
                 fill="none"
@@ -331,7 +310,7 @@ export default function AdminDashboard() {
             </div>
             <div>
               <h1 className="text-lg font-semibold tracking-tight">Dashboard</h1>
-              <p className="text-sm text-slate-400 mt-0.5">
+              <p className="text-sm text-[#A8AEBC] mt-0.5">
                 Welcome, {appUser?.displayName}
               </p>
             </div>
@@ -345,7 +324,7 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={() => void signOut()}
-              className="px-3 py-2 text-sm text-slate-400 hover:text-white transition-colors"
+              className="px-3 py-2 text-sm text-[#A8AEBC] hover:text-white transition-colors"
             >
               Sign out
             </button>
@@ -354,17 +333,45 @@ export default function AdminDashboard() {
       </header>
 
       <main className="w-full max-w-3xl mx-auto px-4 py-5 space-y-5">
+        {/* ================== Top View Tabs ================== */}
+        <div className="flex rounded-xl border border-white/10 bg-white/5 p-1">
+          <button
+            onClick={() => setActiveTab("reports")}
+            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ${
+              activeTab === "reports"
+                ? "bg-[#F4F5F7] text-white shadow-sm"
+                : "text-[#A8AEBC] hover:text-white"
+            }`}
+          >
+            Daftar Laporan
+          </button>
+          <button
+            onClick={() => setActiveTab("schedule")}
+            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ${
+              activeTab === "schedule"
+                ? "bg-[#F4F5F7] text-white shadow-sm"
+                : "text-[#A8AEBC] hover:text-white"
+            }`}
+          >
+            Kelola Jadwal 4S
+          </button>
+        </div>
+
+        {activeTab === "schedule" ? (
+          <AdminScheduleManager areas={areas} />
+        ) : (
+          <>
         {/* ================== Report Mode + Date / Reset Banner ================== */}
         <section className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-400 uppercase tracking-wide">Reporting mode</p>
+            <p className="text-xs text-[#A8AEBC] uppercase tracking-wide">Reporting mode</p>
             <div className="flex rounded-full border border-white/10 overflow-hidden">
               <button
                 onClick={() => setReportMode("daily")}
                 className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                   reportMode === "daily"
-                    ? "bg-[#0d9488] text-white"
-                    : "text-slate-300 hover:bg-white/5"
+                    ? "bg-[#F4F5F7] text-white"
+                    : "text-[#DCDDE1] hover:bg-white/5"
                 }`}
               >
                 Daily
@@ -373,8 +380,8 @@ export default function AdminDashboard() {
                 onClick={() => setReportMode("weekly")}
                 className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                   reportMode === "weekly"
-                    ? "bg-[#0d9488] text-white"
-                    : "text-slate-300 hover:bg-white/5"
+                    ? "bg-[#F4F5F7] text-white"
+                    : "text-[#DCDDE1] hover:bg-white/5"
                 }`}
               >
                 Weekly
@@ -383,8 +390,8 @@ export default function AdminDashboard() {
                 onClick={() => setReportMode("monthly")}
                 className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                   reportMode === "monthly"
-                    ? "bg-[#0d9488] text-white"
-                    : "text-slate-300 hover:bg-white/5"
+                    ? "bg-[#F4F5F7] text-white"
+                    : "text-[#DCDDE1] hover:bg-white/5"
                 }`}
               >
                 Monthly
@@ -392,7 +399,7 @@ export default function AdminDashboard() {
             </div>
           </div>
           <div>
-            <p className="text-xs text-slate-400 uppercase tracking-wide">
+            <p className="text-xs text-[#A8AEBC] uppercase tracking-wide">
               {reportMode === "weekly" ? "Reporting week" : "Reporting window"}
             </p>
             {reportMode === "weekly" ? (
@@ -404,9 +411,9 @@ export default function AdminDashboard() {
                     const d = new Date(`${e.target.value}T00:00:00`)
                     if (!Number.isNaN(d.getTime())) setWeekStartOverride(d.getTime())
                   }}
-                  className="text-sm rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-slate-100"
+                  className="text-sm rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[#F4F5F7]"
                 />
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-[#A8AEBC]">
                   to {new Date(weekEnd - 1).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
                 </span>
               </div>
@@ -430,13 +437,13 @@ export default function AdminDashboard() {
               return areaFiltered.filter((r) => r.timestamp >= resetDate && r.timestamp < dayEnd)
             })()
             return [
-              { label: reportMode === "weekly" ? "This Week" : reportMode === "monthly" ? "This Month" : "Today Reported", value: windowedReports.length },
+              { label: reportMode === "weekly" ? "Minggu Ini" : reportMode === "monthly" ? "Bulan Ini" : "Dilaporkan Hari Ini", value: windowedReports.length },
               {
-                label: "Pending",
+                label: "Menunggu",
                 value: windowedReports.filter((r) => r.status === "pending").length,
               },
               {
-                label: "Resolved",
+                label: "Selesai",
                 value: windowedReports.filter((r) => r.status === "resolved").length,
               },
             ].map((stat) => (
@@ -447,7 +454,7 @@ export default function AdminDashboard() {
                 <p className="text-2xl font-semibold tracking-tight">
                   {stat.value}
                 </p>
-                <p className="text-sm text-slate-400 mt-1">{stat.label}</p>
+                <p className="text-sm text-[#A8AEBC] mt-1">{stat.label}</p>
               </div>
             ))
           })()}
@@ -478,10 +485,10 @@ export default function AdminDashboard() {
 
               {isLoading ? (
                 <div className="flex justify-center py-8">
-                  <div className="w-7 h-7 rounded-full border-2 border-white/10 border-t-[#0d9488] animate-spin" />
+                  <div className="w-7 h-7 rounded-full border-2 border-white/10 border-t-[#F4F5F7] animate-spin" />
                 </div>
               ) : candidates.length === 0 ? (
-                <div className="px-4 py-6 text-center text-sm text-slate-400">
+                <div className="px-4 py-6 text-center text-sm text-[#A8AEBC]">
                     {areaFilter === "all"
                       ? reportMode === "weekly"
                         ? "All zones and items have been reported this week."
@@ -501,10 +508,10 @@ export default function AdminDashboard() {
                     return (
                       <div key={area.areaId}>
                         <div className="px-4 py-2 bg-white/[0.02] border-b border-white/5">
-                          <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
+                          <p className="text-xs font-semibold text-[#DCDDE1] uppercase tracking-wide">
                             {area.name}
                           </p>
-                          <p className="text-[11px] text-slate-500 mt-0.5">
+                          <p className="text-[11px] text-[#8E929B] mt-0.5">
                             {group.length} item{group.length > 1 ? "s" : ""} unreported
                           </p>
                         </div>
@@ -515,14 +522,14 @@ export default function AdminDashboard() {
                               className="px-4 py-2.5 flex items-center justify-between gap-2"
                             >
                               <div className="min-w-0">
-                                <p className="text-sm text-slate-200 truncate">
+                                <p className="text-sm text-[#F4F5F7] truncate">
                                   {item.name}
                                 </p>
-                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                <p className="text-[11px] text-[#8E929B] mt-0.5">
                                   {item.code}
                                 </p>
                               </div>
-                              <span className="text-[11px] px-2 py-0.5 rounded-full border border-red-800 bg-red-900/30 text-red-300 whitespace-nowrap">
+                              <span className="text-[11px] px-2 py-0.5 rounded-full border border-[#C4623F]/60 bg-[#C4623F]/15 text-[#E08462] whitespace-nowrap">
                                 Not reported
                               </span>
                             </div>
@@ -545,8 +552,8 @@ export default function AdminDashboard() {
               onClick={() => setAreaFilter("all")}
               className={`px-3 py-1.5 text-sm rounded-full border whitespace-nowrap transition-colors ${
                 areaFilter === "all"
-                  ? "bg-[#0d9488] text-white border-[#0d9488]"
-                  : "border-white/10 text-slate-300 hover:border-white/20"
+                  ? "bg-[#F4F5F7] text-white border-[#F4F5F7]"
+                  : "border-white/10 text-[#DCDDE1] hover:border-white/20"
               }`}
             >
               Semua Area
@@ -557,8 +564,8 @@ export default function AdminDashboard() {
                 onClick={() => setAreaFilter(area.areaId)}
                 className={`px-3 py-1.5 text-sm rounded-full border whitespace-nowrap transition-colors ${
                   areaFilter === area.areaId
-                    ? "bg-[#0d9488] text-white border-[#0d9488]"
-                    : "border-white/10 text-slate-300 hover:border-white/20"
+                    ? "bg-[#F4F5F7] text-white border-[#F4F5F7]"
+                    : "border-white/10 text-[#DCDDE1] hover:border-white/20"
                 }`}
               >
                 {area.name}
@@ -575,11 +582,11 @@ export default function AdminDashboard() {
                   onClick={() => setFilter(f)}
                   className={`px-3 py-1.5 text-sm rounded-full border whitespace-nowrap transition-colors ${
                     filter === f
-                      ? "bg-[#0d9488] text-white border-[#0d9488]"
-                      : "border-white/10 text-slate-300 hover:border-white/20"
+                      ? "bg-[#F4F5F7] text-white border-[#F4F5F7]"
+                      : "border-white/10 text-[#DCDDE1] hover:border-white/20"
                   }`}
                 >
-                  {f === "all" ? "Semua Status" : getStatusLabel(f)}
+                  {f === "all" ? "Semua Status" : reportStatusTone(f).label}
                 </button>
               )
             )}
@@ -589,10 +596,10 @@ export default function AdminDashboard() {
         {/* ================== Report List (date separated) ================== */}
         {isLoading ? (
           <div className="flex justify-center py-16">
-            <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-[#0d9488] animate-spin" />
+            <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-[#F4F5F7] animate-spin" />
           </div>
         ) : areaFiltered.length === 0 ? (
-          <div className="text-center py-16 text-slate-400">
+          <div className="text-center py-16 text-[#A8AEBC]">
             <div className="w-10 h-10 rounded-full bg-white/5 mx-auto mb-3" />
             <p className="text-sm">No reports found</p>
           </div>
@@ -611,7 +618,7 @@ export default function AdminDashboard() {
                   {/* Date separator header */}
                   <div className="flex items-center gap-3 mb-2">
                     <div className="h-px flex-1 bg-white/10" />
-                    <time className="text-[11px] font-medium text-slate-400 uppercase tracking-widest">
+                    <time className="text-[11px] font-medium text-[#A8AEBC] uppercase tracking-widest">
                       {formatDateRange(dayKey, dayKey + 86_399_999)}
                     </time>
                     <div className="h-px flex-1 bg-white/10" />
@@ -654,7 +661,7 @@ export default function AdminDashboard() {
                         <motion.button
                           key={report.reportId}
                           onClick={() => setSelectedReport(report)}
-                          className="w-full text-left rounded-xl border border-white/10 bg-white/5 p-4 hover:border-[#0d9488]/50 transition-colors"
+                          className="w-full text-left rounded-xl border border-white/10 bg-white/5 p-4 hover:border-[#F4F5F7]/50 transition-colors"
                         >
                           <div className="flex gap-3">
                             {issuePhoto && (
@@ -674,9 +681,9 @@ export default function AdminDashboard() {
                                   {report.areaName || report.areaId}
                                 </p>
                                 <span
-                                  className={`text-xs px-2 py-0.5 rounded-full border ${getStatusColor(report.status)}`}
+                                  className={`text-xs px-2 py-0.5 rounded-full border ${reportStatusTone(report.status, report.checklistData?.hasIssues).className}`}
                                 >
-                                  {getStatusLabel(report.status)}
+                                  {reportStatusTone(report.status, report.checklistData?.hasIssues).label}
                                 </span>
                               </div>
                               {(() => {
@@ -687,17 +694,17 @@ export default function AdminDashboard() {
                                   .filter(Boolean)
                                 if (names.length === 0) return null
                                 return (
-                                  <p className="text-xs text-slate-400 mt-1 truncate">
+                                  <p className="text-xs text-[#A8AEBC] mt-1 truncate">
                                     {names.join(", ")}
                                   </p>
                                 )
                               })()}
-                              <p className="text-sm text-slate-400 mt-1">
+                              <p className="text-sm text-[#A8AEBC] mt-1">
                                 {issueCount > 0
-                                  ? `${issueCount} issue(s) found`
-                                  : "No issues"}
+                                  ? `${issueCount} masalah ditemukan`
+                                  : "Semua normal"}
                               </p>
-                              <p className="text-xs text-slate-500 mt-1">
+                              <p className="text-xs text-[#8E929B] mt-1">
                                 {timeAgo(report.timestamp)}
                               </p>
                             </div>
@@ -710,6 +717,8 @@ export default function AdminDashboard() {
               )
             })}
           </section>
+        )}
+          </>
         )}
       </main>
 
@@ -728,13 +737,13 @@ export default function AdminDashboard() {
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 40, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0f172a] max-h-[85vh] overflow-y-auto"
+              className="w-full max-w-md rounded-2xl border border-white/10 bg-[#222429] max-h-[85vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between p-4 border-b border-white/10">
-                <h2 className="text-sm font-semibold">Report details</h2>
+                <h2 className="text-sm font-semibold">Rincian Laporan</h2>
                 <button
                   onClick={() => setSelectedReport(null)}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 text-slate-400"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 text-[#A8AEBC]"
                 >
                   ✕
                 </button>
@@ -743,28 +752,28 @@ export default function AdminDashboard() {
               <div className="p-4 space-y-4">
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <p className="text-slate-400 text-xs">Area</p>
+                    <p className="text-[#A8AEBC] text-xs">Area</p>
                     <p className="mt-0.5 font-medium">
                       {selectedReport.areaName || selectedReport.areaId}
                     </p>
                   </div>
                   <div>
-                    <p className="text-slate-400 text-xs">Status</p>
+                    <p className="text-[#A8AEBC] text-xs">Status</p>
                     <span
-                      className={`mt-0.5 inline-block text-xs px-2 py-0.5 rounded-full border ${getStatusColor(selectedReport.status)}`}
+                      className={`mt-0.5 inline-block text-xs px-2 py-0.5 rounded-full border ${reportStatusTone(selectedReport.status, selectedReport.checklistData?.hasIssues).className}`}
                     >
-                      {getStatusLabel(selectedReport.status)}
+                      {reportStatusTone(selectedReport.status, selectedReport.checklistData?.hasIssues).label}
                     </span>
                   </div>
                   <div className="col-span-2">
-                    <p className="text-slate-400 text-xs">Time</p>
+                    <p className="text-[#A8AEBC] text-xs">Time</p>
                     <p className="mt-0.5">
                       {new Date(selectedReport.timestamp).toLocaleString()}
                     </p>
                   </div>
                   {workerUid && (
                     <div className="col-span-2">
-                      <p className="text-slate-400 text-xs">Sent by</p>
+                      <p className="text-[#A8AEBC] text-xs">Sent by</p>
                       <p className="mt-0.5 font-medium">
                         {workerDisplayName || workerUid}
                       </p>
@@ -773,7 +782,7 @@ export default function AdminDashboard() {
                   {selectedReport.gpsLat !== undefined &&
                     selectedReport.gpsLng !== undefined && (
                       <div className="col-span-2">
-                        <p className="text-slate-400 text-xs">GPS</p>
+                        <p className="text-[#A8AEBC] text-xs">GPS</p>
                         <p className="mt-0.5">
                           {selectedReport.gpsLat.toFixed(5)},{" "}
                           {selectedReport.gpsLng.toFixed(5)}
@@ -784,7 +793,7 @@ export default function AdminDashboard() {
 
                 {selectedReport.checklistData?.items && (
                   <div className="space-y-3">
-                    <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">
+                    <p className="text-xs text-[#A8AEBC] font-medium uppercase tracking-wide">
                       Checklist
                     </p>
                     {Object.values(selectedReport.checklistData.items).map(
@@ -793,7 +802,7 @@ export default function AdminDashboard() {
                           key={item.id}
                           className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-2"
                         >
-                          <p className="text-sm font-medium text-[#0d9488]">
+                          <p className="text-sm font-medium text-[#F4F5F7]">
                             {item.name}
                           </p>
                           {item.checks.map((check: any) => {
@@ -805,39 +814,39 @@ export default function AdminDashboard() {
 
                             const getBadge = () => {
                               if (!selectedOption || index === -1)
-                                return "bg-white/10 text-slate-400"
+                                return "bg-white/10 text-[#A8AEBC]"
                               if (options.length === 2) {
                                 return index === 0
-                                  ? "bg-emerald-900/40 text-emerald-300"
-                                  : "bg-red-900/40 text-red-300"
+                                  ? "bg-white/5 text-[#F4F5F7]"
+                                  : "bg-[#C4623F]/15 text-[#E08462]"
                               }
                               if (options.length === 3) {
                                 if (index === 0)
-                                  return "bg-emerald-900/40 text-emerald-300"
+                                  return "bg-white/5 text-[#F4F5F7]"
                                 if (index === 1)
-                                  return "bg-amber-900/40 text-amber-300"
-                                return "bg-red-900/40 text-red-300"
+                                  return "bg-[#A8AEBC]/10 text-[#A8AEBC]"
+                                return "bg-[#C4623F]/15 text-[#E08462]"
                               }
                               return index === options.length - 1
-                                ? "bg-red-900/40 text-red-300"
-                                : "bg-emerald-900/40 text-emerald-300"
+                                ? "bg-[#C4623F]/15 text-[#E08462]"
+                                : "bg-white/5 text-[#F4F5F7]"
                             }
 
                             if (check.issueDescription) {
                               return (
                                 <div
                                   key={check.id}
-                                  className="rounded-lg bg-red-950/40 border border-red-900/40 p-3 space-y-2"
+                                  className="rounded-lg bg-[#C4623F]/15 border border-[#C4623F]/40 p-3 space-y-2"
                                 >
-                                  <p className="text-sm font-medium text-red-300">
+                                  <p className="text-sm font-medium text-[#E08462]">
                                     {check.label}
                                   </p>
                                   <div className="space-y-1.5 text-xs">
                                     <div>
-                                      <span className="text-red-400 font-medium">
+                                      <span className="text-[#E08462] font-medium">
                                         Abnormality
                                       </span>
-                                      <p className="text-red-200 mt-0.5 whitespace-pre-wrap">
+                                      <p className="text-[#E08462] mt-0.5 whitespace-pre-wrap">
                                         {check.issueDescription}
                                       </p>
                                     </div>
@@ -849,15 +858,15 @@ export default function AdminDashboard() {
                                           e.stopPropagation()
                                           setPreviewImage(check.issuePhotoUrl)
                                         }}
-                                        className="max-h-40 rounded border border-red-900/50 mt-1 cursor-pointer"
+                                        className="max-h-40 rounded border border-[#C4623F]/40 mt-1 cursor-pointer"
                                       />
                                     )}
                                     {check.afterDescription && (
                                       <div>
-                                        <span className="text-emerald-400 font-medium">
+                                        <span className="text-[#F4F5F7] font-medium">
                                           Action Taken
                                         </span>
-                                        <p className="text-emerald-100 mt-0.5 whitespace-pre-wrap">
+                                        <p className="text-[#F4F5F7] mt-0.5 whitespace-pre-wrap">
                                           {check.afterDescription}
                                         </p>
                                       </div>
@@ -870,7 +879,7 @@ export default function AdminDashboard() {
                                           e.stopPropagation()
                                           setPreviewImage(check.afterPhotoUrl)
                                         }}
-                                        className="max-h-40 rounded border border-emerald-900/50 mt-1 cursor-pointer"
+                                        className="max-h-40 rounded border border-white/15 mt-1 cursor-pointer"
                                       />
                                     )}
                                   </div>
@@ -882,10 +891,10 @@ export default function AdminDashboard() {
                               return (
                                 <div
                                   key={check.id}
-                                  className="rounded-lg bg-emerald-950/40 border border-emerald-900/40 p-3 space-y-2"
+                                  className="rounded-lg bg-white/5 border border-white/15 p-3 space-y-2"
                                 >
                                   <div className="flex items-start justify-between gap-2">
-                                    <p className="text-sm font-medium text-emerald-300">
+                                    <p className="text-sm font-medium text-[#F4F5F7]">
                                       {check.label}
                                     </p>
                                     <span
@@ -895,10 +904,10 @@ export default function AdminDashboard() {
                                     </span>
                                   </div>
                                   <div>
-                                    <span className="text-emerald-400 font-medium text-xs">
+                                    <span className="text-[#F4F5F7] font-medium text-xs">
                                       Action Taken
                                     </span>
-                                    <p className="text-emerald-100 mt-0.5 whitespace-pre-wrap text-xs">
+                                    <p className="text-[#F4F5F7] mt-0.5 whitespace-pre-wrap text-xs">
                                       {check.afterDescription}
                                     </p>
                                   </div>
@@ -911,7 +920,7 @@ export default function AdminDashboard() {
                                 key={check.id}
                                 className="flex items-start justify-between gap-2 text-sm"
                               >
-                                <span className="text-slate-200">
+                                <span className="text-[#F4F5F7]">
                                   {check.label}
                                 </span>
                                 <span
@@ -938,7 +947,7 @@ export default function AdminDashboard() {
                         })
                       }
                       disabled={mutation.isPending}
-                      className="flex-1 px-3 py-2.5 text-sm font-medium rounded-xl bg-teal-900/40 text-teal-200 border border-teal-700/50 hover:bg-teal-900/60 disabled:opacity-50 transition-colors"
+                      className="flex-1 px-3 py-2.5 text-sm font-medium rounded-xl bg-white/5 text-[#F4F5F7] border border-white/20 hover:bg-white/5 disabled:opacity-50 transition-colors"
                     >
                       Mark In Progress
                     </button>
@@ -952,7 +961,7 @@ export default function AdminDashboard() {
                         })
                       }
                       disabled={mutation.isPending}
-                      className="flex-1 px-3 py-2.5 text-sm font-medium rounded-xl bg-emerald-900/40 text-emerald-200 border border-emerald-700/50 hover:bg-emerald-900/60 disabled:opacity-50 transition-colors"
+                      className="flex-1 px-3 py-2.5 text-sm font-medium rounded-xl bg-white/5 text-[#F4F5F7] border border-white/20 hover:bg-white/5 disabled:opacity-50 transition-colors"
                     >
                       Mark Resolved
                     </button>

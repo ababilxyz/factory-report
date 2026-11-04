@@ -15,7 +15,7 @@ const HistoryPage = lazy(() => import('./pages/HistoryPage'))
 function PageLoader() {
   return (
     <div className="min-h-screen bg-factory-dark flex items-center justify-center">
-      <div className="w-8 h-8 rounded-full border-2 border-indigo-500/30 border-t-indigo-500 animate-spin" />
+      <div className="w-8 h-8 rounded-full border-2 border-white/15 border-t-[#F4F5F7] animate-spin" />
     </div>
   )
 }
