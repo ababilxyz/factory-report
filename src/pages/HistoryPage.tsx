@@ -1,28 +1,35 @@
-import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
-import { useAuth } from "../hooks/useAuth"
-import { getReportsByWorkerId } from "../lib/supabaseDb"
-import type { Report } from "../types"
-import { motion, AnimatePresence } from "framer-motion"
-import { reportStatusTone, reportSummaryLabel } from "../lib/reportStatus"
-import WorkerBottomBar from "../components/WorkerBottomBar"
-
-
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
+import { getReportsByWorkerId } from '../lib/supabaseDb'
+import type { Report } from '../types'
+import { reportStatusTone, reportSummaryLabel } from '../lib/reportStatus'
+import WorkerBottomBar from '../components/WorkerBottomBar'
+import FilterDropdown from '../components/FilterDropdown'
+import DateSeparator from '../components/DateSeparator'
+import { groupByDay } from '../lib/groupByDay'
 
 function formatDate(ts: number) {
-  return new Date(ts).toLocaleString()
+  return new Date(ts).toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 export default function HistoryPage() {
   const { appUser } = useAuth()
   const navigate = useNavigate()
   const [reports, setReports] = useState<Report[]>([])
+  const [statusFilter, setStatusFilter] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!appUser) {
-      navigate("/login", { replace: true })
+      navigate('/login', { replace: true })
       return
     }
     loadReports()
@@ -35,143 +42,211 @@ export default function HistoryPage() {
       const data = await getReportsByWorkerId(appUser!.uid)
       setReports(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load history")
+      setError(err instanceof Error ? err.message : 'Gagal memuat riwayat')
       setReports([])
     } finally {
       setLoading(false)
     }
   }
 
+  const visible =
+    statusFilter === null ? reports : reports.filter((r) => r.status === statusFilter)
+
   return (
     <div className="min-h-screen bg-[#18191C] text-[#F4F5F7]">
       <header className="border-b border-white/10 bg-[#18191C]/90">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
           <div>
             <h1 className="text-base font-semibold tracking-tight">Riwayat</h1>
-            <p className="text-sm text-[#A8AEBC] mt-0.5">Laporan yang Anda kirimkan</p>
+            <p className="mt-0.5 text-xs text-[#A8AEBC]">Laporan yang Anda kirimkan</p>
           </div>
           <button
-            onClick={() => navigate("/home")}
-            className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/10 text-[#A8AEBC]"
+            onClick={() => navigate('/home')}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#A8AEBC] hover:bg-white/10"
+            aria-label="Kembali ke Beranda"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 pt-5 pb-32 space-y-3">
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="rounded-xl border border-[#C4623F]/60 bg-[#C4623F]/15 text-[#E08462] text-xs px-3 py-2"
-            >
-              {error}
-            </motion.div>
-          )}
-        </AnimatePresence>
+      <main className="mx-auto max-w-3xl px-4 pb-32 pt-3 space-y-3">
+        <FilterDropdown<string | null>
+          title="Status"
+          selectedLabel={
+            statusFilter === null
+              ? 'Semua Status'
+              : statusFilter === 'pending'
+                ? 'Tertunda'
+                : 'Selesai'
+          }
+          options={[
+            { value: null, label: 'Semua Status' },
+            { value: 'pending', label: 'Tertunda' },
+            { value: 'resolved', label: 'Selesai' },
+          ]}
+          onSelect={setStatusFilter}
+          isHighlighted={statusFilter !== null}
+        />
+
+        {error && (
+          <div className="rounded-[8px] border border-[#C4623F]/60 bg-[#C4623F]/15 px-3 py-2 text-xs text-[#E08462]">
+            {error}
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-16">
-            <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-[#F4F5F7] animate-spin" />
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-[#F4F5F7]" />
           </div>
-        ) : reports.length === 0 ? (
-          <div className="text-center py-16 text-[#A8AEBC]">
-            <div className="w-10 h-10 rounded-full bg-white/5 mx-auto mb-3" />
-            <p className="text-sm font-medium text-[#F4F5F7]">No reports yet</p>
-            <p className="text-xs text-[#8E929B] mt-1">Submit your first inspection to see it here.</p>
+        ) : visible.length === 0 ? (
+          <div className="py-16 text-center text-[#A8AEBC]">
+            <p className="text-sm font-bold text-[#F4F5F7]">Belum ada laporan</p>
+            <p className="mt-1 text-xs text-[#8E929B]">
+              Kirim laporan inspeksi untuk melihat riwayat di sini.
+            </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {reports.map((report) => (
-              <motion.div
-                key={report.reportId}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`relative overflow-hidden rounded-xl border border-white/10 bg-white/5 p-4 ${
-                  report.status === "pending" && report.checklistData?.hasIssues ? "pl-5" : ""
-                }`}
-              >
-                {report.status === "pending" && report.checklistData?.hasIssues && (
-                  <span className="absolute inset-y-0 left-0 w-1 bg-[#C4623F]" />
-                )}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{report.areaName || report.areaId}</p>
-                    <p className="text-xs text-[#8E929B] mt-1">Dikirim {formatDate(report.timestamp)}</p>
-                  </div>
-                  <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full border ${reportStatusTone(report.status, report.checklistData?.hasIssues).className}`}>
-                    {reportStatusTone(report.status, report.checklistData?.hasIssues).label}
-                  </span>
-                </div>
-
-                {(() => {
-                  const checks = Object.values(report.checklistData?.items ?? {}).reduce(
-                    (n: number, it: any) => n + (it.checks?.length ?? 0), 0
-                  )
-                  const hasIssues = report.checklistData?.hasIssues === true
-                  const isOpenIssue = hasIssues && report.status === "pending"
-                  return (
-                    <>
-                      {checks > 0 && (
-                        <div className="mt-3 flex items-center justify-between rounded-lg bg-black/20 px-3 py-2">
-                          <span className={`text-[11px] ${isOpenIssue ? "font-bold text-[#E08462]" : "text-[#A8AEBC]"}`}>
-                            {reportSummaryLabel(hasIssues, isOpenIssue, checks)}
-                          </span>
-                        </div>
-                      )}
-                      {isOpenIssue && report.description && (
-                        <div className="mt-2 rounded-lg border border-[#C4623F]/40 bg-[#C4623F]/10 px-3 py-2">
-                          <p className="text-[11px] text-[#F4F5F7]">Masalah: {report.description}</p>
-                        </div>
-                      )}
-                    </>
-                  )
-                })()}
-
-                {report.checklistData?.items && (
-                  <div className="mt-3 space-y-2">
-                    {Object.values(report.checklistData.items).map((item: any) => (
-                      <div key={item.id} className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-2">
-                        <p className="text-xs font-medium text-[#F4F5F7]">{item.name} ({item.code})</p>
-                        {item.checks.map((check: any) => {
-                          const options = check.options || []
-                          const index = options.indexOf(check.selectedOption)
-                          let badge = "bg-white/10 text-[#A8AEBC]"
-                          if (check.selectedOption && index !== -1) {
-                            if (options.length === 2) badge = index === 0 ? "bg-white/5 text-[#F4F5F7]" : "bg-[#C4623F]/15 text-[#E08462]"
-                            else if (options.length === 3) {
-                              if (index === 0) badge = "bg-white/5 text-[#F4F5F7]"
-                              else if (index === 1) badge = "bg-[#A8AEBC]/10 text-[#A8AEBC]"
-                              else badge = "bg-[#C4623F]/15 text-[#E08462]"
-                            } else {
-                              badge = index === options.length - 1 ? "bg-[#C4623F]/15 text-[#E08462]" : "bg-white/5 text-[#F4F5F7]"
-                            }
-                          }
-                          return (
-                            <div key={check.id} className="flex items-start justify-between gap-2 text-sm">
-                              <span className="text-[#F4F5F7]">{check.label}</span>
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${badge}`}>
-                                {check.selectedOption || "-"}
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </motion.div>
+          <div className="space-y-4">
+            {groupByDay(visible).map((group) => (
+              <div key={group.key} className="space-y-2.5">
+                <DateSeparator label={group.label} />
+                {group.items.map((report) => (
+                  <HistoryReportCard key={report.reportId} report={report} />
+                ))}
+              </div>
             ))}
           </div>
         )}
       </main>
 
       <WorkerBottomBar active="riwayat" />
+    </div>
+  )
+}
+
+function HistoryReportCard({ report }: { report: Report }) {
+  const [expanded, setExpanded] = useState(false)
+  const hasIssues = report.checklistData?.hasIssues === true
+  const isOpenIssue = hasIssues && report.status === 'pending'
+  const tone = reportStatusTone(report.status, hasIssues)
+
+  const checks = Object.values(report.checklistData?.items ?? {}).reduce(
+    (n: number, it: any) => n + (it.checks?.length ?? 0),
+    0
+  )
+
+  const itemCode =
+    report.checklistData?.items &&
+    Object.values(report.checklistData.items)[0]?.code
+
+  return (
+    <div
+      className={`relative overflow-hidden rounded-[20px] border border-[#2F3238] bg-[#222429] p-4 ${
+        isOpenIssue ? 'pl-5' : ''
+      }`}
+    >
+      {isOpenIssue && <span className="absolute inset-y-0 left-0 w-1 bg-[#C4623F]" />}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex items-start gap-2.5">
+          {itemCode && (
+            <span className="shrink-0 rounded-[8px] bg-[#1B1D22] px-2 py-1 text-[11px] font-extrabold text-[#F4F5F7]">
+              {itemCode}
+            </span>
+          )}
+          <div>
+            <p className="truncate text-sm font-bold text-[#F4F5F7]">
+              {report.areaName || report.areaId}
+            </p>
+            <p className="mt-0.5 text-xs text-[#8E929B]">
+              Dikirim {formatDate(report.timestamp)}
+            </p>
+          </div>
+        </div>
+        <span
+          className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-extrabold ${tone.className}`}
+        >
+          {tone.label}
+        </span>
+      </div>
+
+      {checks > 0 && (
+        <div className="mt-3 flex items-center justify-between rounded-[8px] bg-[#1B1D22] px-3 py-2 text-[11px]">
+          <span
+            className={
+              isOpenIssue
+                ? 'font-bold text-[#E08462]'
+                : hasIssues
+                  ? 'text-[#F4F5F7]'
+                  : 'text-[#A8AEBC]'
+            }
+          >
+            {reportSummaryLabel(hasIssues, isOpenIssue, checks)}
+          </span>
+          {report.checklistData?.items && (
+            <button
+              type="button"
+              onClick={() => setExpanded(!expanded)}
+              className="font-bold text-[#F4F5F7] hover:text-[#A8AEBC]"
+            >
+              {expanded ? 'Tutup ▴' : 'Rincian ▾'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {isOpenIssue && report.description && (
+        <div className="mt-2 rounded-[8px] border border-[#C4623F]/40 bg-[#C4623F]/10 px-3 py-2 text-[11px] text-[#F4F5F7]">
+          Masalah: {report.description}
+        </div>
+      )}
+
+      {expanded && report.checklistData?.items && (
+        <div className="mt-3 space-y-2 border-t border-[#2F3238] pt-3">
+          {Object.values(report.checklistData.items).map((item: any) => (
+            <div
+              key={item.id}
+              className="space-y-1.5 rounded-[10px] border border-[#2F3238] bg-[#18191C] p-3"
+            >
+              <p className="text-xs font-semibold text-[#F4F5F7]">
+                {item.name} ({item.code})
+              </p>
+              {item.checks.map((c: any) => {
+                const isBad =
+                  c.selectedOption &&
+                  c.options &&
+                  c.selectedOption === c.options[c.options.length - 1] &&
+                  c.options.length > 1
+                return (
+                  <div
+                    key={c.id}
+                    className="flex items-start justify-between gap-2 text-xs"
+                  >
+                    <span className="text-[#A8AEBC]">{c.label}</span>
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                        isBad
+                          ? 'border border-[#C4623F]/60 bg-[#C4623F]/20 text-[#E08462]'
+                          : 'bg-white/5 text-[#F4F5F7]'
+                      }`}
+                    >
+                      {c.selectedOption || '—'}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

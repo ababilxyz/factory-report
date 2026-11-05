@@ -50,6 +50,16 @@ export default function ProfilePage() {
     })
   }
 
+  if (!userProfile && appUser) {
+    setUserProfile(appUser)
+    setEditedProfile({ ...appUser })
+  }
+
+  const initials = (() => {
+    const words = (userProfile?.displayName || 'OP').trim().split(/\s+/)
+    return (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase()
+  })()
+
   if (!appUser) {
     navigate('/login', { replace: true })
     return null
@@ -89,21 +99,18 @@ export default function ProfilePage() {
         <div className="rounded-xl border border-white/10 bg-white/5 p-5">
           <div className="space-y-4">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-[#F4F5F7]/20 flex items-center justify-center">
-                <svg className="w-7 h-7 text-[#F4F5F7]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
+              <div className="w-14 h-14 rounded-full bg-[#222429] border border-[#2F3238] flex items-center justify-center font-bold text-lg text-[#F4F5F7]">
+                {initials}
               </div>
 
               <div className="flex-1">
-                <h2 className="text-white font-semibold tracking-tight">
+                <h2 className="text-[#F4F5F7] font-semibold tracking-tight">
                   {userProfile?.displayName || 'Worker'}
                 </h2>
-                <p className="text-sm text-[#A8AEBC]">{userProfile?.email || 'No email'}</p>
-                <p className="text-xs text-[#F4F5F7] font-medium mt-0.5">
-                  Role: {userProfile?.role === 'worker' ? 'Field Worker' : 'Administrator'}
-                </p>
+                <p className="text-xs text-[#A8AEBC]">{userProfile?.email || 'Email belum diisi'}</p>
+                <span className="mt-1 inline-block rounded-chip border border-[#2F3238] bg-[#1B1D22] px-2 py-0.5 text-[10px] font-semibold text-[#F4F5F7]">
+                  {userProfile?.role === 'worker' ? 'Pekerja Lapangan' : 'Administrator'}
+                </span>
               </div>
 
               {!editing && (
@@ -119,12 +126,12 @@ export default function ProfilePage() {
             {editing ? (
               <form className="space-y-3">
                 <div>
-                  <label className="block text-xs text-[#A8AEBC] mb-1.5">Display name</label>
+                  <label className="block text-xs text-[#A8AEBC] mb-1.5">Nama Tampilan</label>
                   <input
                     type="text"
                     value={editedProfile?.displayName || ''}
                     onChange={(e) => handleInputChange('displayName', e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-[#222429] px-3 py-2.5 text-sm text-white placeholder:text-[#8E929B] focus:outline-none focus:border-[#F4F5F7] transition-colors"
+                    className="w-full rounded-lg border border-[#2F3238] bg-[#18191C] px-3 py-2 text-xs text-white placeholder:text-[#8E929B] focus:outline-none focus:border-[#F4F5F7] transition-colors"
                   />
                 </div>
                 <div>
@@ -133,7 +140,7 @@ export default function ProfilePage() {
                     type="email"
                     value={editedProfile?.email || ''}
                     onChange={(e) => handleInputChange('email', e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-[#222429] px-3 py-2.5 text-sm text-white placeholder:text-[#8E929B] focus:outline-none focus:border-[#F4F5F7] transition-colors"
+                    className="w-full rounded-lg border border-[#2F3238] bg-[#18191C] px-3 py-2 text-xs text-white placeholder:text-[#8E929B] focus:outline-none focus:border-[#F4F5F7] transition-colors"
                   />
                 </div>
                 <div className="flex gap-2 pt-1">
@@ -141,35 +148,34 @@ export default function ProfilePage() {
                     type="button"
                     onClick={handleSave}
                     disabled={saving}
-                    className="flex-1 rounded-lg bg-[#F4F5F7] text-white text-sm font-medium py-2.5 hover:bg-[#F4F5F7]/90 disabled:opacity-50 transition-colors"
+                    className="flex-1 rounded-lg bg-[#F4F5F7] text-[#121417] text-xs font-bold py-2.5 hover:bg-[#F4F5F7]/90 disabled:opacity-50 transition-colors"
                   >
-                    {saving ? 'Saving...' : 'Save changes'}
+                    {saving ? 'Menyimpan...' : 'Simpan'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setEditing(false)}
-                    className="px-3 py-2.5 rounded-lg border border-white/10 text-sm text-[#DCDDE1] hover:text-white hover:border-white/20 transition-colors"
+                    className="px-4 py-2.5 rounded-lg border border-[#2F3238] text-xs text-[#DCDDE1] hover:text-white transition-colors"
                   >
-                    Cancel
+                    Batal
                   </button>
                 </div>
               </form>
             ) : (
-              <div className="space-y-3 pt-1">
-                <div>
-                  <p className="text-xs text-[#8E929B]">User ID</p>
-                  <p className="text-sm text-[#F4F5F7] mt-0.5">{userProfile?.uid}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-[#8E929B]">Member since</p>
-                  <p className="text-sm text-[#F4F5F7] mt-0.5">
-                    {userProfile?.createdAt ? new Date(userProfile.createdAt).toLocaleDateString() : 'Unknown'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-[#8E929B]">Last active</p>
-                  <p className="text-sm text-[#F4F5F7] mt-0.5">Today</p>
-                </div>
+              <div className="rounded-[12px] border border-[#2F3238] bg-[#1B1D22] p-4 space-y-3">
+                {[
+                  { label: 'KODE OPERATOR', value: `OP-${(userProfile?.uid ?? '00000000').slice(0, 8).toUpperCase()}`, mono: true },
+                  { label: 'LINE', value: 'AA', mono: false },
+                  { label: 'TERDAFTAR SEJAK', value: userProfile?.createdAt ? new Date(userProfile.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Tidak diketahui', mono: false },
+                ].map((row, i) => (
+                  <div key={row.label}>
+                    {i > 0 && <div className="my-2.5 h-px bg-white/5" />}
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[10px] font-medium tracking-wide text-[#8E929B]">{row.label}</span>
+                      <span className={`text-xs text-[#F4F5F7] ${row.mono ? 'font-mono' : ''}`}>{row.value}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -177,10 +183,14 @@ export default function ProfilePage() {
 
         <button
           onClick={() => void signOut()}
-          className="w-full rounded-lg border border-white/10 bg-white/5 text-sm text-[#DCDDE1] py-2.5 hover:border-white/20 hover:text-white transition-colors"
+          className="w-full rounded-[12px] border border-[#C4623F]/40 bg-[#C4623F]/10 text-xs font-semibold text-[#E08462] py-3 hover:bg-[#C4623F]/20 transition-colors"
         >
-          Keluar
+          Keluar Akun
         </button>
+
+        <p className="pt-2 text-center text-[10px] text-[#8E929B]">
+          Sistem Inspeksi Pabrik 3PilarAA • v1.0
+        </p>
       </main>
 
       <WorkerBottomBar active="profil" />

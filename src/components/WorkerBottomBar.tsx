@@ -23,7 +23,7 @@ export default function WorkerBottomBar({ active }: { active: WorkerTab }) {
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 px-5 pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
       <div
-        className="mx-auto flex h-[66px] max-w-md items-center justify-between rounded-[33px] border border-white/15 bg-[#222429]/90 px-3 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]"
+        className="glass-rim mx-auto flex h-[66px] max-w-md items-center justify-between rounded-[33px] bg-[#222429]/90 px-3 backdrop-blur-md"
       >
         <PillTab label="Beranda" active={active === 'beranda'} onClick={() => navigate(TAB_ROUTES.beranda)} />
 

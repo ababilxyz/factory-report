@@ -47,7 +47,7 @@ export default function ScannerPage() {
               <path strokeLinecap='round' strokeLinejoin='round' d='M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21' />
             </svg>
           </div>
-          <h1 className="text-white font-semibold text-sm">Scan Area QR</h1>
+          <h1 className="text-white font-semibold text-sm">Pindai QR Mesin</h1>
         </div>
         <div className="w-11" /> {/* Spacer */}
       </div>
@@ -75,7 +75,7 @@ export default function ScannerPage() {
               animate={{ opacity: 1, y: 0 }}
               className="text-white/80 text-sm mt-6 font-medium"
             >
-              {scanState === 'idle' ? 'Starting camera...' : 'Point at the QR code in the area'}
+              {scanState === 'idle' ? 'Menyalakan kamera...' : 'Arahkan kamera ke kode QR mesin'}
             </motion.p>
           </motion.div>
         )}
@@ -84,7 +84,7 @@ export default function ScannerPage() {
           <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4">
             <div className="w-16 h-16 rounded-full border-4 border-factory-accent/30 border-t-factory-accent animate-spin" />
             <p className="text-white font-medium">{statusMessage}</p>
-            <p className="text-white/50 text-sm">Please wait...</p>
+            <p className="text-white/50 text-sm">Mohon tunggu...</p>
           </div>
         )}
 
@@ -105,9 +105,9 @@ export default function ScannerPage() {
               </svg>
             </motion.div>
             <div className="text-center">
-              <p className="text-[#F4F5F7] font-semibold text-lg">Area Verified</p>
+              <p className="text-[#F4F5F7] font-semibold text-lg">QR Terverifikasi</p>
               <p className="text-white text-xl font-bold mt-1">{result.areaName}</p>
-              <p className="text-white/50 text-sm mt-2">Redirecting to report form...</p>
+              <p className="text-white/50 text-sm mt-2">Membuka formulir laporan...</p>
             </div>
           </motion.div>
         )}
@@ -130,17 +130,17 @@ export default function ScannerPage() {
             </motion.div>
             <div className="text-center">
               <p className="text-[#E08462] font-semibold">
-                {error.code === 'LOCATION_MISMATCH' ? 'Wrong Location' :
-                 error.code === 'PERMISSION_DENIED' ? 'Permission Denied' :
-                 'Scan Failed'}
+                {error.code === 'LOCATION_MISMATCH' ? 'Lokasi Tidak Cocok' :
+                 error.code === 'PERMISSION_DENIED' ? 'Izin Kamera / Lokasi Ditolak' :
+                 'Pindai Gagal'}
               </p>
               <p className="text-white/70 text-sm mt-2 max-w-xs leading-relaxed">{error.message}</p>
             </div>
             <button
               onClick={() => void reset().then(() => startScanner())}
-              className="bg-factory-accent text-white px-6 py-3 rounded-xl font-medium min-h-[44px]"
+              className="bg-[#F4F5F7] text-[#121417] font-bold px-6 py-3 rounded-xl min-h-[44px]"
             >
-              Try Again
+              Coba Lagi
             </button>
           </motion.div>
         )}

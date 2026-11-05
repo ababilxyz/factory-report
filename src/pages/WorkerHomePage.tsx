@@ -7,6 +7,7 @@ import { getReportsByWorkerId, getAllAreas, getScheduleForDay, getScheduleForMon
 import type { Report, Area, ScheduleSlot } from '../types'
 import { reportStatusTone } from '../lib/reportStatus'
 import WorkerBottomBar from '../components/WorkerBottomBar'
+import ParticleField from '../components/ParticleField'
 
 export default function WorkerHomePage() {
   const { appUser } = useAuth()
@@ -63,8 +64,8 @@ export default function WorkerHomePage() {
   }, [appUser])
 
   const openCount = reports.filter(r => r.status === 'pending').length
-  const inProgressCount = reports.filter(r => r.status === 'in_progress').length
   const resolvedCount = reports.filter(r => r.status === 'resolved').length
+  const issueCount = reports.filter(r => r.status === 'pending' && r.checklistData?.hasIssues === true).length
 
   const recentIssues = reports
     .filter(r => r.status === 'pending' || r.status === 'in_progress')
@@ -84,6 +85,7 @@ export default function WorkerHomePage() {
   }
   const doneCount = schedule.filter((s) => doneItemIds.has(s.itemId) || doneItemIds.has(s.itemCode)).length
   const totalMinutes = schedule.reduce((acc, s) => acc + s.durationMinutes, 0)
+  const percent = schedule.length === 0 ? 0 : Math.round((doneCount / schedule.length) * 100)
 
   const getAreaName = (areaId: string) => {
     const area = areas.find(a => a.areaId === areaId)
@@ -160,6 +162,87 @@ export default function WorkerHomePage() {
 
       {/* Main content */}
       <main className='flex-1 flex flex-col items-center justify-center px-5 pt-6 pb-32 gap-6'>
+        {/* Today Progress Card (glass + particles) */}
+        <button
+          type='button'
+          onClick={() => navigate('/scan')}
+          className='glass-rim relative w-full max-w-sm overflow-hidden rounded-[22px] border border-[#2F3238] bg-[#222429]/55 p-5 text-left transition-transform active:scale-[0.99]'
+        >
+          <ParticleField count={18} seed={11} />
+          <p className='relative text-[10px] font-semibold tracking-wider uppercase text-[#8E929B]'>
+            Progres Inspeksi Shift
+          </p>
+          <div className='relative mt-2 flex items-center justify-between'>
+            <div className='flex items-baseline'>
+              <span className='text-[38px] font-extrabold leading-none text-[#F4F5F7]'>
+                {loading ? '…' : doneCount}
+              </span>
+              <span className='ml-1.5 text-xs text-[#A8AEBC]'>
+                / {schedule.length} tugas selesai
+              </span>
+            </div>
+            <span className='rounded-full bg-[#F4F5F7] px-3.5 py-1 text-xs font-extrabold text-[#121417]'>
+              {percent}%
+            </span>
+          </div>
+          <div className='relative mt-3.5 h-2 w-full overflow-hidden rounded-full bg-[#2F3238]'>
+            <div
+              className='h-full rounded-full bg-[#F4F5F7] transition-all duration-300'
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+          <p className='relative mt-2.5 text-[11px] text-[#A8AEBC]'>
+            {loading
+              ? 'Memuat jadwal…'
+              : schedule.length === 0
+                ? scheduleMessage || 'Belum ada tugas hari ini'
+                : `${schedule.length - doneCount} tugas tersisa • ${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}`}
+          </p>
+        </button>
+
+        {/* Ringkasan Tiles (label di bawah, nomor di kotak) */}
+        <div className='w-full max-w-sm'>
+          <div className='mb-2.5 flex items-center justify-between'>
+            <h2 className='text-sm font-bold text-[#F4F5F7]'>Ringkasan</h2>
+            <button
+              onClick={() => navigate('/history')}
+              className='text-xs font-semibold text-[#A8AEBC] hover:text-[#F4F5F7]'
+            >
+              Lihat semua
+            </button>
+          </div>
+          <div className='grid grid-cols-3 gap-2.5'>
+            {[
+              { label: 'Tertunda', value: openCount, isIssue: false },
+              { label: 'Masalah', value: issueCount, isIssue: true },
+              { label: 'Selesai', value: resolvedCount, isIssue: false },
+            ].map((tile) => (
+              <button
+                key={tile.label}
+                type='button'
+                onClick={() => navigate('/history')}
+                className='group text-center'
+              >
+                <div className='rounded-[16px] border border-[#2F3238] bg-[#222429] py-3.5 px-2 transition-colors group-hover:border-[#F4F5F7]/40'>
+                  <span className='text-2xl font-extrabold text-[#F4F5F7]'>
+                    {loading ? '—' : tile.value}
+                  </span>
+                </div>
+                <p
+                  className={`mt-1.5 text-[11px] font-medium ${
+                    tile.isIssue ? 'text-[#C4623F]' : 'text-[#A8AEBC]'
+                  }`}
+                >
+                  {tile.label}
+                </p>
+              </button>
+            ))}
+          </div>
+          <p className='mt-2.5 text-[10px] text-[#8E929B]'>
+            {openCount} Tertunda termasuk {issueCount} Masalah. Selesai {resolvedCount} tugas.
+          </p>
+        </div>
+
         {/* Today's Schedule Card */}
         <div className='w-full max-w-sm bg-[#222429] border border-[#2F3238] rounded-2xl p-4 space-y-3'>
           <div className='flex items-center justify-between'>
@@ -235,64 +318,17 @@ export default function WorkerHomePage() {
           )}
         </div>
 
-        {/* Scan QR Card - centered hero */}
-        <motion.button
-          onClick={() => navigate('/scan')}
-          whileTap={{ scale: 0.98 }}
-          className='w-full max-w-sm bg-[#222429] border border-[#2F3238] rounded-2xl p-8 flex flex-col items-center gap-5 hover:border-[#F4F5F7]/40 transition-all'
-        >
-          <div className='w-28 h-28 rounded-2xl bg-[#F4F5F7]/10 border border-[#F4F5F7]/25 flex items-center justify-center'>
-            <QrCode className='w-14 h-14 text-[#F4F5F7]' />
-          </div>
-          <div className='text-center'>
-            <p className='text-[#F4F5F7] font-extrabold text-xl tracking-wide uppercase'>
-              SCAN QR CODE
-            </p>
-            <p className='text-[#A8AEBC] text-sm mt-2'>
-              Pindai QR mesin untuk memulai inspeksi
-            </p>
-          </div>
-        </motion.button>
-
-        {/* Stats */}
-        <div className='w-full max-w-xs grid grid-cols-3 gap-2'>
-          <div className='bg-[#222429] border border-[#2F3238] rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 text-center min-h-[88px]'>
-            <span className='text-[#F4F5F7] text-xl font-bold'>
-              {loading ? '-' : openCount}
-            </span>
-            <span className='text-[#8E929B] text-[9px] uppercase tracking-wider font-medium whitespace-nowrap'>
-              Open
-            </span>
-          </div>
-          <div className='bg-[#222429] border border-[#2F3238] rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 text-center min-h-[88px]'>
-            <span className='text-[#A8AEBC] text-xl font-bold'>
-              {loading ? '-' : inProgressCount}
-            </span>
-            <span className='text-[#8E929B] text-[9px] uppercase tracking-wider font-medium whitespace-nowrap'>
-              In Progress
-            </span>
-          </div>
-          <div className='bg-[#222429] border border-[#2F3238] rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 text-center min-h-[88px]'>
-            <span className='text-[#F4F5F7] text-xl font-bold'>
-              {loading ? '-' : resolvedCount}
-            </span>
-            <span className='text-[#8E929B] text-[9px] uppercase tracking-wider font-medium whitespace-nowrap'>
-              Resolved
-            </span>
-          </div>
-        </div>
-
         {/* Recent Issues */}
         <div className='w-full max-w-sm flex-1'>
           <div className='flex items-center justify-between mb-3'>
             <h2 className='text-[#F4F5F7] font-bold text-sm'>
-              MY RECENT ISSUES
+              Tindak Lanjut
             </h2>
             <button
               onClick={() => navigate('/history')}
               className='text-[#8E929B] text-xs hover:text-[#F4F5F7] transition-colors font-medium'
             >
-              View all
+              Lihat semua
             </button>
           </div>
 

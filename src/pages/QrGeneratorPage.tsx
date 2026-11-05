@@ -76,7 +76,7 @@ export default function QrGeneratorPage() {
               }}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 reportMode === 'daily'
-                  ? 'bg-[#F4F5F7] text-white'
+                  ? 'bg-[#F4F5F7] text-[#121417]'
                   : 'text-[#DCDDE1] hover:bg-white/5'
               }`}
             >
@@ -90,7 +90,7 @@ export default function QrGeneratorPage() {
               }}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 reportMode === 'weekly'
-                  ? 'bg-[#F4F5F7] text-white'
+                  ? 'bg-[#F4F5F7] text-[#121417]'
                   : 'text-[#DCDDE1] hover:bg-white/5'
               }`}
             >
@@ -104,7 +104,7 @@ export default function QrGeneratorPage() {
               }}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 reportMode === 'monthly'
-                  ? 'bg-[#F4F5F7] text-white'
+                  ? 'bg-[#F4F5F7] text-[#121417]'
                   : 'text-[#DCDDE1] hover:bg-white/5'
               }`}
             >

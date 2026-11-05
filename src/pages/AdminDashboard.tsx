@@ -20,6 +20,8 @@ import AdminScheduleDesktop from "../components/AdminScheduleDesktop"
 import AdminSummaryDesktop from "../components/AdminSummaryDesktop"
 import { getScheduleForMonth } from "../lib/supabaseDb"
 import { reportStatusTone } from "../lib/reportStatus"
+import FilterDropdown from "../components/FilterDropdown"
+import DateSeparator from "../components/DateSeparator"
 
 // ==================
 // Helpers
@@ -30,11 +32,11 @@ import { reportStatusTone } from "../lib/reportStatus"
 function timeAgo(ts: number) {
   const diff = Date.now() - ts
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return "just now"
-  if (mins < 60) return `${mins}m ago`
+  if (mins < 1) return "baru saja"
+  if (mins < 60) return `${mins}m lalu`
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
+  if (hours < 24) return `${hours}j lalu`
+  return `${Math.floor(hours / 24)}h lalu`
 }
 
 /** Returns the start-of-day timestamp in milliseconds for a given ms timestamp */
@@ -417,7 +419,7 @@ export default function AdminDashboard() {
             onClick={() => setActiveTab("reports")}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ${
               activeTab === "reports"
-                ? "bg-[#F4F5F7] text-white shadow-sm"
+                ? "bg-[#F4F5F7] text-[#121417] shadow-sm"
                 : "text-[#A8AEBC] hover:text-white"
             }`}
           >
@@ -427,7 +429,7 @@ export default function AdminDashboard() {
             onClick={() => setActiveTab("schedule")}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ${
               activeTab === "schedule"
-                ? "bg-[#F4F5F7] text-white shadow-sm"
+                ? "bg-[#F4F5F7] text-[#121417] shadow-sm"
                 : "text-[#A8AEBC] hover:text-white"
             }`}
           >
@@ -448,7 +450,7 @@ export default function AdminDashboard() {
                 onClick={() => setReportMode("daily")}
                 className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                   reportMode === "daily"
-                    ? "bg-[#F4F5F7] text-white"
+                    ? "bg-[#F4F5F7] text-[#121417]"
                     : "text-[#DCDDE1] hover:bg-white/5"
                 }`}
               >
@@ -458,7 +460,7 @@ export default function AdminDashboard() {
                 onClick={() => setReportMode("weekly")}
                 className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                   reportMode === "weekly"
-                    ? "bg-[#F4F5F7] text-white"
+                    ? "bg-[#F4F5F7] text-[#121417]"
                     : "text-[#DCDDE1] hover:bg-white/5"
                 }`}
               >
@@ -468,7 +470,7 @@ export default function AdminDashboard() {
                 onClick={() => setReportMode("monthly")}
                 className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                   reportMode === "monthly"
-                    ? "bg-[#F4F5F7] text-white"
+                    ? "bg-[#F4F5F7] text-[#121417]"
                     : "text-[#DCDDE1] hover:bg-white/5"
                 }`}
               >
@@ -623,52 +625,36 @@ export default function AdminDashboard() {
         })()}
 
         {/* ================== Zone Filter + Status Filters ================== */}
-        <section className="space-y-2">
-          {/* Zone filter chips */}
-          <section className="flex gap-2 overflow-x-auto pb-1">
-            <button
-              onClick={() => setAreaFilter("all")}
-              className={`px-3 py-1.5 text-sm rounded-full border whitespace-nowrap transition-colors ${
-                areaFilter === "all"
-                  ? "bg-[#F4F5F7] text-white border-[#F4F5F7]"
-                  : "border-white/10 text-[#DCDDE1] hover:border-white/20"
-              }`}
-            >
-              Semua Area
-            </button>
-            {areas.map((area) => (
-              <button
-                key={area.areaId}
-                onClick={() => setAreaFilter(area.areaId)}
-                className={`px-3 py-1.5 text-sm rounded-full border whitespace-nowrap transition-colors ${
-                  areaFilter === area.areaId
-                    ? "bg-[#F4F5F7] text-white border-[#F4F5F7]"
-                    : "border-white/10 text-[#DCDDE1] hover:border-white/20"
-                }`}
-              >
-                {area.name}
-              </button>
-            ))}
-          </section>
+        <section className="grid grid-cols-2 gap-2.5">
+          <FilterDropdown<string>
+            title="Area"
+            selectedLabel={
+              areaFilter === "all"
+                ? "Semua Area"
+                : areas.find((a) => a.areaId === areaFilter)?.name || areaFilter
+            }
+            options={[
+              { value: "all", label: "Semua Area" },
+              ...areas.map((a) => ({ value: a.areaId, label: a.name })),
+            ]}
+            onSelect={setAreaFilter}
+            isHighlighted={areaFilter !== "all"}
+          />
 
-          {/* Status filter chips */}
-          <section className="flex gap-2 overflow-x-auto pb-1">
-            {(["all", "pending", "in_progress", "resolved"] as const).map(
-              (f) => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={`px-3 py-1.5 text-sm rounded-full border whitespace-nowrap transition-colors ${
-                    filter === f
-                      ? "bg-[#F4F5F7] text-white border-[#F4F5F7]"
-                      : "border-white/10 text-[#DCDDE1] hover:border-white/20"
-                  }`}
-                >
-                  {f === "all" ? "Semua Status" : reportStatusTone(f).label}
-                </button>
-              )
-            )}
-          </section>
+          <FilterDropdown<string>
+            title="Status"
+            selectedLabel={
+              filter === "all" ? "Semua Status" : reportStatusTone(filter).label
+            }
+            options={[
+              { value: "all", label: "Semua Status" },
+              { value: "pending", label: "Menunggu" },
+              { value: "in_progress", label: "Diproses" },
+              { value: "resolved", label: "Selesai" },
+            ]}
+            onSelect={(val) => setFilter(val as any)}
+            isHighlighted={filter !== "all"}
+          />
         </section>
 
         {/* ================== Report List (date separated) ================== */}
@@ -679,7 +665,7 @@ export default function AdminDashboard() {
         ) : areaFiltered.length === 0 ? (
           <div className="text-center py-16 text-[#A8AEBC]">
             <div className="w-10 h-10 rounded-full bg-white/5 mx-auto mb-3" />
-            <p className="text-sm">No reports found</p>
+            <p className="text-sm">Tidak ada laporan ditemukan</p>
           </div>
         ) : (
           <section className="space-y-4">
@@ -693,14 +679,7 @@ export default function AdminDashboard() {
 
               return (
                 <div key={dayKey}>
-                  {/* Date separator header */}
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="h-px flex-1 bg-white/10" />
-                    <time className="text-[11px] font-medium text-[#A8AEBC] uppercase tracking-widest">
-                      {formatDateRange(dayKey, dayKey + 86_399_999)}
-                    </time>
-                    <div className="h-px flex-1 bg-white/10" />
-                  </div>
+                  <DateSeparator label={formatDateRange(dayKey, dayKey + 86_399_999)} />
 
                   {/* Report cards for this date */}
                   <div className="space-y-3">

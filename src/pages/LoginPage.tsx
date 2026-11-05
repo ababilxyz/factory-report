@@ -64,10 +64,10 @@ export default function LoginPage() {
         {/* Brand Header */}
         <div className="text-center mb-8">
           <h1 className="text-white text-2xl font-bold tracking-wide uppercase">
-            Secure Access
+            Akses Terbatas
           </h1>
           <p className="text-[#8E929B] text-[10px] tracking-[0.15em] uppercase mt-2">
-            Encrypted · Authenticated · Validated
+            Terenkripsi · Terautentikasi · Tervalidasi
           </p>
         </div>
 
@@ -93,7 +93,7 @@ export default function LoginPage() {
             {/* Email */}
             <div>
               <label htmlFor="email" className="block text-[10px] text-[#8E929B] tracking-wider uppercase mb-1.5">
-                Email Address
+                Alamat Email
               </label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E929B]" />
@@ -105,7 +105,7 @@ export default function LoginPage() {
                   required
                   autoComplete="email"
                   className="w-full bg-[#18191C] border border-[#2F3238] rounded-xl pl-11 pr-4 py-3 text-white text-sm placeholder-[#8E929B] focus:outline-none focus:border-[#F4F5F7]/60 transition-colors min-h-[44px]"
-                  placeholder="operator@factory.com"
+                  placeholder="operator@3pilaraa.co.id"
                 />
               </div>
             </div>
@@ -113,7 +113,7 @@ export default function LoginPage() {
             {/* Password */}
             <div>
               <label htmlFor="password" className="block text-[10px] text-[#8E929B] tracking-wider uppercase mb-1.5">
-                Password
+                Kata Sandi
               </label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E929B]" />
@@ -142,7 +142,7 @@ export default function LoginPage() {
               type="submit"
               disabled={loading}
               whileTap={{ scale: loading ? 1 : 0.97 }}
-              className="w-full bg-[#F4F5F7] hover:bg-[#A8AEBC] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl py-3.5 transition-colors min-h-[44px] flex items-center justify-center gap-2 tracking-wide uppercase text-sm"
+              className="w-full bg-[#F4F5F7] hover:bg-[#DCDDE1] disabled:opacity-50 disabled:cursor-not-allowed text-[#121417] font-extrabold rounded-xl py-3.5 transition-colors min-h-[44px] flex items-center justify-center gap-2 tracking-wide uppercase text-xs"
             >
               {loading ? (
                 <>
@@ -150,12 +150,12 @@ export default function LoginPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                   </svg>
-                  Authenticating...
+                  Memverifikasi...
                 </>
               ) : (
                 <>
                   <Shield className="w-4 h-4" />
-                  Authenticate & Enter
+                  Masuk
                 </>
               )}
             </motion.button>
@@ -171,12 +171,12 @@ export default function LoginPage() {
         >
           <Shield className="w-3.5 h-3.5 text-[#E08462] mt-0.5 flex-shrink-0" />
           <p className="text-[#8E929B] text-[11px] leading-relaxed">
-            All sessions are encrypted and geo-validated. Unauthorized access attempts are logged and reported.
+            Sesi terenkripsi dan terikat lokasi geofence. Akses tanpa izin dicatat dalam log sistem pabrik.
           </p>
         </motion.div>
 
         <p className="text-center text-[#8E929B] text-[11px] mt-5">
-          Need access? Contact your Team Leader.
+          Belum punya akun? Hubungi supervisor shift.
         </p>
       </motion.div>
     </div>

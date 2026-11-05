@@ -20,6 +20,14 @@ export default {
           danger: '#C4623F'
         }
       },
+      borderRadius: {
+        chip: '8px',
+        field: '12px',
+        tile: '16px',
+        card: '20px',
+        glass: '22px',
+        capsule: '33px'
+      },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace']

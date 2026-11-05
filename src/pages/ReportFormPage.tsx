@@ -528,15 +528,15 @@ export default function ReportFormPage() {
           </svg>
         </motion.div>
         <div className="text-center">
-          <h2 className="text-white text-2xl font-bold">Report Submitted</h2>
-          <p className="text-factory-muted mt-2">
-            Your report has been sent to the team leader.
+          <h2 className="text-white text-2xl font-bold">Laporan Terkirim</h2>
+          <p className="text-[#8E929B] mt-2 text-sm">
+            Laporan inspeksi berhasil dikirim ke supervisor shift.
           </p>
         </div>
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => navigate("/home")}
-          className="bg-factory-accent text-white px-8 py-3.5 rounded-xl font-semibold min-h-[44px]"
+          className="bg-[#F4F5F7] text-[#121417] px-8 py-3.5 rounded-xl font-extrabold min-h-[44px]"
         >
           Kembali ke Beranda
         </motion.button>
@@ -579,7 +579,7 @@ export default function ReportFormPage() {
           </svg>
         </motion.button>
         <div>
-          <h1 className="text-white font-semibold">Report Issue</h1>
+          <h1 className="text-white font-semibold">Formulir Inspeksi</h1>
           <p className="text-factory-accent text-xs font-medium">
             {scanResult.areaName}
           </p>
@@ -589,7 +589,7 @@ export default function ReportFormPage() {
       {/* Example Photo Section */}
       {scanItem?.examplePhotoUrl && (
         <div className="p-4 bg-factory-card border-b border-factory-border">
-          <p className="text-xs text-factory-muted mb-2">Example Reference:</p>
+          <p className="text-xs text-factory-muted mb-2">Foto Acuan Standar:</p>
           <img
             src={scanItem.examplePhotoUrl}
             alt="Example reference"
@@ -894,12 +894,12 @@ export default function ReportFormPage() {
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                 />
               </svg>
-              Submitting...
+              Mengirim...
             </>
           ) : (
             <>
               <Upload className="w-4 h-4" />
-              Submit Report
+              Kirim Laporan
             </>
           )}
         </motion.button>
