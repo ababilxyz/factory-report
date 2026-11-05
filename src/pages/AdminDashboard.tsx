@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import AdminScheduleManager from "../components/AdminScheduleManager"
 import AdminScheduleDesktop from "../components/AdminScheduleDesktop"
 import AdminSummaryDesktop from "../components/AdminSummaryDesktop"
-import { getScheduleForMonth } from "../lib/supabaseDb"
+import { getScheduleForMonth, getReportsForMonth } from "../lib/supabaseDb"
 import { reportStatusTone } from "../lib/reportStatus"
 import FilterDropdown from "../components/FilterDropdown"
 import DateSeparator from "../components/DateSeparator"
@@ -102,6 +102,7 @@ export default function AdminDashboard() {
       setResetDate((prev) => (prev !== newDay ? newDay : prev))
       // Invalidate report data when any boundary might have crossed
       queryClient.invalidateQueries({ queryKey: ["reports"] })
+      queryClient.invalidateQueries({ queryKey: ["reports-month"] })
     }, 60_000)
     return () => clearInterval(interval)
   }, [queryClient])
@@ -141,6 +142,11 @@ export default function AdminDashboard() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
   }, [])
   const scheduleMonth = currentYearMonth
+
+  const { data: monthReports = [] } = useQuery({
+    queryKey: ["reports-month", scheduleMonth],
+    queryFn: () => getReportsForMonth(scheduleMonth),
+  })
 
   const { data: scheduleSlots = [] } = useQuery({
     queryKey: ["schedules", scheduleMonth],
@@ -198,6 +204,7 @@ export default function AdminDashboard() {
       updateReportStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reports"] })
+      queryClient.invalidateQueries({ queryKey: ["reports-month"] })
       setSelectedReport((prev) => {
         if (!prev) return prev
         return { ...prev, status: prev.status }
@@ -401,12 +408,12 @@ export default function AdminDashboard() {
             <AdminScheduleDesktop
               yearMonth={scheduleMonth}
               slots={scheduleSlots}
-              reports={reports}
+              reports={monthReports}
               areas={areas}
               onOpenReport={(r) => setSelectedReport(r)}
             />
           ) : (
-            <AdminSummaryDesktop reports={reports} slots={scheduleSlots} />
+            <AdminSummaryDesktop reports={monthReports} slots={scheduleSlots} />
           )}
         </div>
       </div>
