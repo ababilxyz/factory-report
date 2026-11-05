@@ -117,6 +117,7 @@ export interface Report {
     reportType?: ReportType
     weekStart?: number
     monthStart?: number
+    updatedAt?: number
 }
 
 export interface CreateReportInput {

@@ -240,7 +240,26 @@ export async function getReports(
   const { data, error } = await query
 
   if (error) throw error
-  return (data || []).map((d: any) => ({
+  return (data || []).map(mapReport)
+}
+
+/** Semua laporan di satu bulan (yyyy-mm), tanpa limit dan tanpa filter status. */
+export async function getReportsForMonth(yearMonth: string): Promise<Report[]> {
+  const [y, m] = yearMonth.split('-').map(Number)
+  const start = new Date(y, m - 1, 1).getTime()
+  const end = new Date(y, m, 1).getTime()
+  const { data, error } = await supabase
+    .from('reports')
+    .select('*')
+    .gte('timestamp', start)
+    .lt('timestamp', end)
+    .order('timestamp', { ascending: false })
+  if (error) throw error
+  return (data || []).map(mapReport)
+}
+
+function mapReport(d: any): Report {
+  return {
     reportId: d.report_id,
     areaId: d.area_id,
     areaName: d.area_name,
@@ -255,8 +274,9 @@ export async function getReports(
     timestamp: d.timestamp,
     deviceId: d.device_id,
     sessionId: d.session_id,
-    checklistData: d.checklist_data
-  })) as Report[]
+    checklistData: d.checklist_data,
+    updatedAt: d.updated_at,
+  } as Report
 }
 
 export async function getReportsByWorkerId(workerUid: string, limitCount = 50): Promise<Report[]> {
