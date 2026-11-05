@@ -1,184 +1,282 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { motion } from 'framer-motion'
-import { Mail, Lock, Shield, Eye, EyeOff } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
+
+// Cermin LoginScreen.kt: header atas dengan kontur topografi dan brand 3PilarAA,
+// kartu form melengkung 32px dari bawah header, validasi inline per field.
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const CONTOUR_PATHS = [
+  'M-20 46.8 C120 13 240 83.2 420 39',
+  'M-20 91 C100 52 260 124.8 420 72.8',
+  'M-20 135.2 C140 98.8 280 161.2 420 117',
+  'M-20 176.8 C80 143 220 202.8 420 156',
+  'M-20 221 C160 182 300 239.2 420 202.8',
+]
+
+const fieldBase =
+  'w-full min-h-[52px] rounded-[12px] border bg-[#222429] text-sm text-[#F4F5F7] placeholder:text-[#A8AEBC]/45 focus:outline-none transition-colors'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(true)
+  const [showPassword, setShowPassword] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const { signIn, appUser } = useAuth()
   const navigate = useNavigate()
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    const cleanEmail = email.trim()
+    const eErr = !cleanEmail
+      ? 'Email wajib diisi'
+      : !EMAIL_RE.test(cleanEmail)
+        ? 'Format email tidak valid'
+        : null
+    const pErr = password ? null : 'Kata sandi wajib diisi'
+
+    setEmailError(eErr)
+    setPasswordError(pErr)
     setError('')
+    if (eErr || pErr) return
+
     setLoading(true)
     try {
-      await signIn(email, password)
-      // Navigation handled by router after appUser is set
+      await signIn(cleanEmail, password)
+      // Navigasi dilakukan setelah appUser terisi
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Login failed'
-      if (msg.includes('Invalid login credentials') || msg.includes('Email not confirmed')) {
-        setError('Invalid email or password.')
-      } else {
-        setError(msg)
-      }
+      const msg = err instanceof Error ? err.message : ''
+      setError(
+        msg === 'Invalid email or password.'
+          ? 'Email atau kata sandi salah.'
+          : msg === 'Please confirm your email before signing in.'
+            ? 'Email belum dikonfirmasi. Hubungi supervisor shift.'
+            : msg.startsWith('Too many failed')
+              ? 'Terlalu banyak percobaan gagal. Coba lagi beberapa menit lagi.'
+              : 'Gagal masuk. Silakan coba lagi.'
+      )
     } finally {
       setLoading(false)
     }
   }
 
-  // Redirect after successful login
-  if (appUser) {
-    navigate(appUser.role === 'admin' ? '/dashboard' : '/home', { replace: true })
-    return null
-  }
+  useEffect(() => {
+    if (appUser) navigate(appUser.role === 'admin' ? '/dashboard' : '/home', { replace: true })
+  }, [appUser, navigate])
+
+  const emailBorder = emailError
+    ? 'border-[#C4623F]'
+    : 'border-[#2F3238] focus:border-[#F4F5F7]/60'
+  const passwordBorder = passwordError
+    ? 'border-[#C4623F]'
+    : 'border-[#2F3238] focus:border-[#F4F5F7]/60'
 
   return (
-    <div className="min-h-screen bg-[#18191C] flex items-center justify-center p-6">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-        className="w-full max-w-sm"
-      >
-        {/* Shield Icon */}
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.4 }}
-          className="flex justify-center mb-6"
+    <div className="relative min-h-screen overflow-hidden bg-[#222429]">
+      {/* Header atas: gradien kartu -> surface, kontur, brand */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[260px] bg-gradient-to-b from-[#222429] to-[#18191C]">
+        <svg
+          className="absolute inset-0 h-full w-full"
+          viewBox="0 0 400 260"
+          preserveAspectRatio="none"
+          aria-hidden
         >
-          <div className="relative">
-            <div className="w-20 h-20 rounded-2xl border-2 border-[#F4F5F7]/60 bg-[#F4F5F7]/10 flex items-center justify-center">
-              <Shield className="w-10 h-10 text-[#F4F5F7]" strokeWidth={1.5} />
-            </div>
-            <div className="absolute inset-0 rounded-2xl border-2 border-[#F4F5F7]/30 animate-pulse" />
-          </div>
-        </motion.div>
-
-        {/* Brand Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-white text-2xl font-bold tracking-wide uppercase">
-            Akses Terbatas
-          </h1>
-          <p className="text-[#8E929B] text-[10px] tracking-[0.15em] uppercase mt-2">
-            Terenkripsi · Terautentikasi · Tervalidasi
+          {CONTOUR_PATHS.map((d) => (
+            <path
+              key={d}
+              d={d}
+              fill="none"
+              stroke="rgba(255,255,255,0.14)"
+              strokeWidth="1.5"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+        </svg>
+        <div className="relative pt-[18px] text-center">
+          <p className="text-[32px] font-extrabold tracking-[0.5px] text-[#F4F5F7]">3PilarAA</p>
+          <p className="mt-0.5 text-xs font-medium tracking-[0.3px] text-[#A8AEBC]">
+            Sistem Inspeksi &amp; Pelaporan
           </p>
         </div>
+      </div>
 
-        {/* Login Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.4 }}
-          className="bg-[#222429] border border-[#2F3238] rounded-2xl p-6"
-        >
-          {/* Error */}
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-[#C4623F]/15 border border-[#C4623F]/40 text-[#E08462] text-xs rounded-lg px-4 py-2.5 mb-4"
-            >
-              {error}
-            </motion.div>
-          )}
+      {/* Kartu form: mulai 180px dari atas, sudut atas 32px, sampai bawah */}
+      <main className="relative flex min-h-screen flex-col pt-[180px]">
+        <div className="mx-auto flex w-full max-w-[440px] flex-1 flex-col rounded-t-[32px] bg-[#222429] px-7 pb-8 pt-8 shadow-[0_-12px_32px_rgba(0,0,0,0.35)]">
+          <h1 className="text-[28px] font-extrabold leading-tight text-[#F4F5F7]">Masuk</h1>
+          <div className="mt-1.5 h-[3.5px] w-[42px] rounded-full bg-[#F4F5F7]" />
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="block text-[10px] text-[#8E929B] tracking-wider uppercase mb-1.5">
-                Alamat Email
+          <div className="mt-6 flex flex-1 flex-col">
+            {error && (
+              <div
+                role="alert"
+                className="mb-4 rounded-[12px] border border-[#C4623F]/40 bg-[#C4623F]/15 px-4 py-3 text-xs text-[#E08462]"
+              >
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} noValidate className="flex flex-1 flex-col">
+              {/* Email */}
+              <label htmlFor="email" className="text-[13px] font-bold text-[#F4F5F7]">
+                Email
               </label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E929B]" />
+              <div className="relative mt-1.5">
+                <Mail
+                  className={`pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 ${
+                    email.trim() ? 'text-[#F4F5F7]' : 'text-[#8E929B]'
+                  }`}
+                />
                 <input
                   id="email"
                   type="email"
                   value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  required
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setEmailError(null)
+                    setError('')
+                  }}
                   autoComplete="email"
-                  className="w-full bg-[#18191C] border border-[#2F3238] rounded-xl pl-11 pr-4 py-3 text-white text-sm placeholder-[#8E929B] focus:outline-none focus:border-[#F4F5F7]/60 transition-colors min-h-[44px]"
-                  placeholder="operator@3pilaraa.co.id"
+                  placeholder="nama@aa.com"
+                  className={`${fieldBase} ${emailBorder} py-3 pl-12 pr-4`}
                 />
               </div>
-            </div>
+              {emailError && <p className="mt-1.5 text-[11px] text-[#E08462]">{emailError}</p>}
 
-            {/* Password */}
-            <div>
-              <label htmlFor="password" className="block text-[10px] text-[#8E929B] tracking-wider uppercase mb-1.5">
+              {/* Kata Sandi */}
+              <label htmlFor="password" className="mt-[18px] text-[13px] font-bold text-[#F4F5F7]">
                 Kata Sandi
               </label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E929B]" />
+              <div className="relative mt-1.5">
+                <Lock
+                  className={`pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 ${
+                    password ? 'text-[#F4F5F7]' : 'text-[#8E929B]'
+                  }`}
+                />
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    setPasswordError(null)
+                    setError('')
+                  }}
                   autoComplete="current-password"
-                  className="w-full bg-[#18191C] border border-[#2F3238] rounded-xl pl-11 pr-11 py-3 text-white text-sm placeholder-[#8E929B] focus:outline-none focus:border-[#F4F5F7]/60 transition-colors min-h-[44px]"
-                  placeholder="••••••••"
+                  className={`${fieldBase} ${passwordBorder} py-3 pl-12 pr-12`}
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8E929B] hover:text-[#A8AEBC] transition-colors"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                  className="absolute right-1 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center text-[#A8AEBC] transition-colors hover:text-[#F4F5F7]"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
-            </div>
-
-            {/* Submit */}
-            <motion.button
-              type="submit"
-              disabled={loading}
-              whileTap={{ scale: loading ? 1 : 0.97 }}
-              className="w-full bg-[#F4F5F7] hover:bg-[#DCDDE1] disabled:opacity-50 disabled:cursor-not-allowed text-[#121417] font-extrabold rounded-xl py-3.5 transition-colors min-h-[44px] flex items-center justify-center gap-2 tracking-wide uppercase text-xs"
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                  </svg>
-                  Memverifikasi...
-                </>
-              ) : (
-                <>
-                  <Shield className="w-4 h-4" />
-                  Masuk
-                </>
+              {passwordError && (
+                <p className="mt-1.5 text-[11px] text-[#E08462]">{passwordError}</p>
               )}
-            </motion.button>
-          </form>
-        </motion.div>
 
-        {/* Security Notice */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="mt-5 bg-[#222429] border border-[#2F3238] rounded-xl px-4 py-3 flex items-start gap-2.5"
+              {/* Ingat Saya + Lupa Kata Sandi */}
+              <div className="mt-3.5 flex items-center justify-between">
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={rememberMe}
+                  onClick={() => setRememberMe((v) => !v)}
+                  className="flex items-center gap-1.5 rounded-lg px-0.5 py-1"
+                >
+                  <span
+                    className={`flex h-6 w-6 items-center justify-center rounded-[6px] border ${
+                      rememberMe ? 'border-[#F4F5F7] bg-[#F4F5F7]' : 'border-[#8E929B]'
+                    }`}
+                  >
+                    {rememberMe && (
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4 text-[#121417]"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                        aria-hidden
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className="text-xs font-medium text-[#F4F5F7]">Ingat Saya</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowHelp(true)}
+                  className="flex h-12 items-center px-2 text-xs font-bold text-[#F4F5F7]"
+                >
+                  Lupa Kata Sandi?
+                </button>
+              </div>
+
+              {/* Dorong tombol dan footer ke bawah kartu */}
+              <div className="flex-1" />
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-6 flex h-[52px] w-full items-center justify-center gap-2.5 rounded-[12px] bg-[#F4F5F7] text-[15px] font-bold text-[#121417] transition-colors hover:bg-[#DCDDE1] disabled:opacity-40"
+              >
+                {loading ? (
+                  <>
+                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#121417]/25 border-t-[#121417]" />
+                    Memproses...
+                  </>
+                ) : (
+                  'Masuk'
+                )}
+              </button>
+
+              <p className="mt-5 text-center text-xs text-[#A8AEBC]">
+                Belum punya akun? Hubungi supervisor shift.
+              </p>
+            </form>
+          </div>
+        </div>
+      </main>
+
+      {showHelp && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
+          onClick={() => setShowHelp(false)}
         >
-          <Shield className="w-3.5 h-3.5 text-[#E08462] mt-0.5 flex-shrink-0" />
-          <p className="text-[#8E929B] text-[11px] leading-relaxed">
-            Sesi terenkripsi dan terikat lokasi geofence. Akses tanpa izin dicatat dalam log sistem pabrik.
-          </p>
-        </motion.div>
-
-        <p className="text-center text-[#8E929B] text-[11px] mt-5">
-          Belum punya akun? Hubungi supervisor shift.
-        </p>
-      </motion.div>
+          <div
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-[20px] border border-[#2F3238] bg-[#222429] p-6"
+          >
+            <h2 className="text-base font-bold text-[#F4F5F7]">Bantuan Kata Sandi</h2>
+            <p className="mt-3 text-[13px] leading-relaxed text-[#A8AEBC]">
+              Akun pekerja dikelola terpusat oleh administrator pabrik 3PilarAA. Jika Anda lupa
+              kata sandi atau mengalami masalah saat masuk, silakan hubungi supervisor shift atau
+              administrator Anda untuk mereset kata sandi.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowHelp(false)}
+              className="mt-5 ml-auto block text-sm font-bold text-[#F4F5F7]"
+            >
+              Mengerti
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
