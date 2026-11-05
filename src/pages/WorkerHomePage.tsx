@@ -1,118 +1,112 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Factory, QrCode, User, Clock, CalendarDays, CheckCircle2 } from 'lucide-react'
-import { useState, useEffect } from 'react'
-import { getReportsByWorkerId, getAllAreas, getScheduleForDay, getScheduleForMonth } from '../lib/supabaseDb'
-import type { Report, Area, ScheduleSlot } from '../types'
+import { QrCode, RefreshCw, CheckCircle2 } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { getReportsByWorkerId, getScheduleForDay, getScheduleForMonth } from '../lib/supabaseDb'
+import type { Report, ScheduleSlot } from '../types'
 import { reportStatusTone } from '../lib/reportStatus'
 import WorkerBottomBar from '../components/WorkerBottomBar'
 import ParticleField from '../components/ParticleField'
 
+// Setara DateFormatter.formatDate di Android: "dd MMM yyyy" (id-ID).
+const formatDate = (timestamp: number) =>
+  new Date(timestamp).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+
 export default function WorkerHomePage() {
   const { appUser } = useAuth()
   const navigate = useNavigate()
+  const displayName = appUser?.displayName || 'Operator'
 
   const [reports, setReports] = useState<Report[]>([])
-  const [areas, setAreas] = useState<Area[]>([])
   const [schedule, setSchedule] = useState<ScheduleSlot[]>([])
   const [scheduleMessage, setScheduleMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null)
   const [selectedReport, setSelectedReport] = useState<Report | null>(null)
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true)
-        const now = new Date()
-        const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-        const dayOfMonth = now.getDate()
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true)
+      setErrorMessage(null)
+      const now = new Date()
+      const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const dayOfMonth = now.getDate()
+      const uid = appUser?.uid || ''
 
-        const [reportsData, areasData, scheduleData] = await Promise.all([
-          getReportsByWorkerId(appUser?.uid || ''),
-          getAllAreas(),
-          getScheduleForDay(appUser?.uid || '', yearMonth, dayOfMonth)
-        ])
-        setReports(reportsData)
-        setAreas(areasData)
-        setSchedule(scheduleData)
+      const [reportsData, scheduleData] = await Promise.all([
+        getReportsByWorkerId(uid),
+        getScheduleForDay(uid, yearMonth, dayOfMonth),
+      ])
+      setReports(reportsData)
+      setSchedule(scheduleData)
+      setLastUpdated(Date.now())
 
-        if (scheduleData.length === 0) {
-          try {
-            const monthSchedule = await getScheduleForMonth(yearMonth)
-            setScheduleMessage(
-              monthSchedule.length === 0
-                ? 'Jadwal bulan ini belum diunggah admin.'
-                : 'Tidak ada tugas inspeksi untuk Anda hari ini.'
-            )
-          } catch {
-            setScheduleMessage('Tidak ada tugas inspeksi untuk Anda hari ini.')
-          }
-        } else {
-          setScheduleMessage(null)
+      if (scheduleData.length === 0) {
+        try {
+          const monthSchedule = await getScheduleForMonth(yearMonth)
+          setScheduleMessage(
+            monthSchedule.length === 0
+              ? 'Jadwal bulan ini belum diunggah admin.'
+              : 'Tidak ada tugas inspeksi untuk Anda hari ini.'
+          )
+        } catch {
+          setScheduleMessage('Tidak ada tugas inspeksi untuk Anda hari ini.')
         }
-      } catch (err) {
-        console.error('Failed to load dashboard data:', err)
-      } finally {
-        setLoading(false)
+      } else {
+        setScheduleMessage(null)
       }
-    }
-
-    if (appUser) {
-      loadData()
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err)
+      setErrorMessage('Gagal memuat data. Periksa koneksi lalu coba lagi.')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
     }
   }, [appUser])
 
-  const openCount = reports.filter(r => r.status === 'pending').length
+  useEffect(() => {
+    if (appUser) loadData()
+  }, [appUser, loadData])
+
+  const handleRefresh = () => {
+    setRefreshing(true)
+    void loadData()
+  }
+
+  // Ringkasan: sama dengan WorkerHomeViewModel (pending, masalah, selesai).
+  const pending = reports.filter(r => r.status === 'pending')
+  const openCount = pending.length
+  const issueCount = pending.filter(r => r.checklistData?.hasIssues === true).length
   const resolvedCount = reports.filter(r => r.status === 'resolved').length
-  const issueCount = reports.filter(r => r.status === 'pending' && r.checklistData?.hasIssues === true).length
+  const recentIssues = pending.slice(0, 4)
 
-  const recentIssues = reports
-    .filter(r => r.status === 'pending' || r.status === 'in_progress')
-    .slice(0, 3)
-
+  // Tugas hari ini dianggap selesai jika sudah ada laporan hari ini untuk item tsb.
   const todayStart = new Date()
   todayStart.setHours(0, 0, 0, 0)
   const doneItemIds = new Set<string>()
   for (const report of reports) {
     if (report.timestamp < todayStart.getTime()) continue
-    const items = report.checklistData?.items
-    if (!items) continue
-    for (const item of Object.values(items)) {
-      if (item.id) doneItemIds.add(item.id)
-      if (item.code) doneItemIds.add(item.code)
-    }
+    const id = report.checklistData?.areaId
+    if (id) doneItemIds.add(id)
   }
-  const doneCount = schedule.filter((s) => doneItemIds.has(s.itemId) || doneItemIds.has(s.itemCode)).length
-  const totalMinutes = schedule.reduce((acc, s) => acc + s.durationMinutes, 0)
-  const percent = schedule.length === 0 ? 0 : Math.round((doneCount / schedule.length) * 100)
-
-  const getAreaName = (areaId: string) => {
-    const area = areas.find(a => a.areaId === areaId)
-    return area?.name || areaId
-  }
-
-  const getItemLabel = (report: Report) => {
-    const items = report.checklistData?.items
-      ? Object.values(report.checklistData.items)
-      : []
-    const first = items[0]
-    if (!first) return report.reportId.slice(0, 6).toUpperCase()
-    const name = first.name || first.code
-    const code = first.code
-    return code ? `${name} · ${code}` : name
-  }
-
-  const formatTime = (timestamp: number) => {
-    return new Date(timestamp).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    })
-  }
-
-
-
+  const isDone = (slot: ScheduleSlot) => doneItemIds.has(slot.itemId)
+  const doneCount = schedule.filter(isDone).length
+  const remaining = Math.max(schedule.length - doneCount, 0)
+  // Android memakai toInt() (dibulatkan ke bawah).
+  const percent = schedule.length === 0 ? 0 : Math.floor((doneCount / schedule.length) * 100)
+  const firstIncompleteIndex = schedule.findIndex(s => !isDone(s))
+  const todayLabel = new Date().toLocaleDateString('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+  const updatedLabel = lastUpdated
+    ? new Date(lastUpdated).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    : null
 
   const getCheckBadge = (options: string[], selectedOption?: string) => {
     if (!selectedOption) return 'bg-white/10 text-[#A8AEBC]'
@@ -133,103 +127,112 @@ export default function WorkerHomePage() {
       animate={{ opacity: 1 }}
       className='min-h-screen bg-[#18191C] flex flex-col'
     >
-      {/* Header */}
-      <header className='bg-[#18191C] px-5 pt-5 pb-3'>
-        <div className='flex items-center justify-between'>
-          <div className='flex items-center gap-3'>
-            <div className='relative'>
-              <div className='w-9 h-9 rounded-lg bg-[#F4F5F7] flex items-center justify-center'>
-                <Factory className='w-4 h-4 text-white' />
-              </div>
-              <div className='absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#F4F5F7] border-2 border-[#18191C]' />
-            </div>
-            <div>
-              <h1 className='text-[#F4F5F7] font-semibold text-base leading-tight'>
-                {appUser?.displayName || 'Operator'}
-              </h1>
-              <p className='text-[#8E929B] text-xs'>Selamat bertugas</p>
-            </div>
-          </div>
-          <button
-            onClick={() => navigate('/profile')}
-            className='w-8 h-8 flex items-center justify-center rounded-lg border border-[#2F3238] text-[#8E929B] hover:text-white hover:border-[#3A3D44] transition-all'
-            aria-label='Profile'
-          >
-            <User className='w-4 h-4' />
-          </button>
+      {/* Header: sama dengan HomeHeader di Android */}
+      <header className='sticky top-0 z-10 flex items-center gap-1 bg-[#18191C] pb-2 pl-4 pr-2 pt-[calc(env(safe-area-inset-top)+12px)]'>
+        <div className='min-w-0 flex-1'>
+          <h1 className='text-2xl font-extrabold leading-tight text-[#F4F5F7]'>Beranda</h1>
+          <p className='text-xs text-[#A8AEBC]'>
+            {updatedLabel ? `${displayName} · ${updatedLabel}` : `${displayName} · Shift hari ini`}
+          </p>
         </div>
+        <button
+          type='button'
+          onClick={handleRefresh}
+          disabled={refreshing}
+          aria-label='Segarkan data laporan'
+          className='flex h-12 w-12 items-center justify-center rounded-full disabled:opacity-60'
+        >
+          {refreshing ? (
+            <span className='h-5 w-5 animate-spin rounded-full border-2 border-[#2F3238] border-t-[#F4F5F7]' />
+          ) : (
+            <RefreshCw className='h-[22px] w-[22px] text-[#A8AEBC]' />
+          )}
+        </button>
+        <button
+          type='button'
+          onClick={() => navigate('/profile')}
+          aria-label='Profil'
+          className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#F4F5F7]/[0.14] text-[17px] font-bold text-[#F4F5F7]'
+        >
+          {displayName.charAt(0).toUpperCase()}
+        </button>
       </header>
 
-      {/* Main content */}
-      <main className='flex-1 flex flex-col items-center justify-center px-5 pt-6 pb-32 gap-6'>
-        {/* Today Progress Card (glass + particles) */}
+      {/* Konten: jarak antar item 16px, seperti LazyColumn Android */}
+      <main className='flex flex-1 flex-col gap-4 px-4 pt-2 pb-[104px]'>
+        {errorMessage && (
+          <div className='flex items-center justify-between gap-2 rounded-lg border border-[#C4623F]/35 bg-[#C4623F]/[0.08] px-3 py-1'>
+            <p className='min-w-0 flex-1 text-[13px] text-[#C4623F]'>{errorMessage}</p>
+            <button
+              type='button'
+              onClick={handleRefresh}
+              className='h-12 shrink-0 px-2 text-[13px] font-semibold text-[#C4623F]'
+            >
+              Coba Lagi
+            </button>
+          </div>
+        )}
+
+        {/* Kartu progres (glass) */}
         <button
           type='button'
           onClick={() => navigate('/scan')}
-          className='glass-rim relative w-full max-w-sm overflow-hidden rounded-[22px] border border-[#2F3238] bg-[#222429]/55 p-5 text-left transition-transform active:scale-[0.99]'
+          className='glass-rim relative w-full overflow-hidden rounded-[22px] bg-[#222429]/55 p-[18px] text-left transition-transform active:scale-[0.99]'
         >
           <ParticleField count={18} seed={11} />
-          <p className='relative text-[10px] font-semibold tracking-wider uppercase text-[#8E929B]'>
-            Progres Inspeksi Shift
-          </p>
-          <div className='relative mt-2 flex items-center justify-between'>
-            <div className='flex items-baseline'>
-              <span className='text-[38px] font-extrabold leading-none text-[#F4F5F7]'>
-                {loading ? '…' : doneCount}
-              </span>
-              <span className='ml-1.5 text-xs text-[#A8AEBC]'>
-                / {schedule.length} tugas selesai
+          <div className='relative'>
+            <p className='text-[11px] font-medium text-[#A8AEBC]'>Progres Inspeksi Shift</p>
+            <div className='mt-1.5 flex items-center justify-between'>
+              <div className='flex items-end'>
+                <span className='text-[38px] font-extrabold leading-none text-[#F4F5F7]'>
+                  {loading ? '…' : doneCount}
+                </span>
+                <span className='mb-[7px] ml-1 text-[13px] text-[#A8AEBC]'>
+                  / {schedule.length} tugas selesai
+                </span>
+              </div>
+              <span className='rounded-[15px] bg-[#F4F5F7] px-3.5 py-[7px] text-[13px] font-extrabold text-[#121417]'>
+                {percent}%
               </span>
             </div>
-            <span className='rounded-full bg-[#F4F5F7] px-3.5 py-1 text-xs font-extrabold text-[#121417]'>
-              {percent}%
-            </span>
+            <div className='mt-3.5 h-2 w-full overflow-hidden rounded-full bg-[#2F3238]'>
+              <div
+                className='h-full rounded-full bg-[#F4F5F7] transition-all duration-300'
+                style={{ width: `${percent}%` }}
+              />
+            </div>
+            <p className='mt-2.5 text-[11px] text-[#A8AEBC]'>
+              {loading
+                ? 'Memuat jadwal…'
+                : schedule.length === 0
+                  ? scheduleMessage || 'Belum ada tugas hari ini'
+                  : `${remaining} tugas tersisa • ${todayLabel}`}
+            </p>
           </div>
-          <div className='relative mt-3.5 h-2 w-full overflow-hidden rounded-full bg-[#2F3238]'>
-            <div
-              className='h-full rounded-full bg-[#F4F5F7] transition-all duration-300'
-              style={{ width: `${percent}%` }}
-            />
-          </div>
-          <p className='relative mt-2.5 text-[11px] text-[#A8AEBC]'>
-            {loading
-              ? 'Memuat jadwal…'
-              : schedule.length === 0
-                ? scheduleMessage || 'Belum ada tugas hari ini'
-                : `${schedule.length - doneCount} tugas tersisa • ${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}`}
-          </p>
         </button>
 
-        {/* Ringkasan Tiles (label di bawah, nomor di kotak) */}
-        <div className='w-full max-w-sm'>
-          <div className='mb-2.5 flex items-center justify-between'>
-            <h2 className='text-sm font-bold text-[#F4F5F7]'>Ringkasan</h2>
-            <button
-              onClick={() => navigate('/history')}
-              className='text-xs font-semibold text-[#A8AEBC] hover:text-[#F4F5F7]'
-            >
-              Lihat semua
-            </button>
-          </div>
-          <div className='grid grid-cols-3 gap-2.5'>
+        {/* Ringkasan: kotak angka + label di bawah */}
+        <div>
+          <h2 className='text-[15px] font-bold text-[#F4F5F7]'>Ringkasan</h2>
+          <div className='mt-2 grid grid-cols-4 gap-2.5'>
             {[
               { label: 'Tertunda', value: openCount, isIssue: false },
               { label: 'Masalah', value: issueCount, isIssue: true },
               { label: 'Selesai', value: resolvedCount, isIssue: false },
+              // PWA belum punya antrian offline; nilai tetap 0 agar layout sama dengan Android.
+              { label: 'Offline', value: 0, isIssue: false },
             ].map((tile) => (
               <button
                 key={tile.label}
                 type='button'
                 onClick={() => navigate('/history')}
-                className='group text-center'
+                className='group flex flex-col'
               >
-                <div className='rounded-[16px] border border-[#2F3238] bg-[#222429] py-3.5 px-2 transition-colors group-hover:border-[#F4F5F7]/40'>
-                  <span className='text-2xl font-extrabold text-[#F4F5F7]'>
-                    {loading ? '—' : tile.value}
-                  </span>
+                <div className='rounded-[18px] border border-[#2F3238] bg-[#222429] px-1 py-3.5 text-center transition-colors group-hover:border-[#F4F5F7]/40'>
+                  <span className='text-2xl font-extrabold text-[#F4F5F7]'>{tile.value}</span>
                 </div>
                 <p
-                  className={`mt-1.5 text-[11px] font-medium ${
+                  className={`mt-1.5 text-center text-[11px] font-medium ${
                     tile.isIssue ? 'text-[#C4623F]' : 'text-[#A8AEBC]'
                   }`}
                 >
@@ -238,143 +241,144 @@ export default function WorkerHomePage() {
               </button>
             ))}
           </div>
-          <p className='mt-2.5 text-[10px] text-[#8E929B]'>
+          <p className='mt-2 pl-0.5 text-[10px] text-[#A8AEBC]'>
             {openCount} Tertunda termasuk {issueCount} Masalah. Selesai {resolvedCount} tugas.
           </p>
         </div>
 
-        {/* Today's Schedule Card */}
-        <div className='w-full max-w-sm bg-[#222429] border border-[#2F3238] rounded-2xl p-4 space-y-3'>
-          <div className='flex items-center justify-between'>
-            <div className='flex items-center gap-2'>
-              <CalendarDays className='w-4 h-4 text-[#F4F5F7]' />
-              <div>
-                <p className='text-[#F4F5F7] font-bold text-sm'>Jadwal Tugas Hari Ini</p>
-                <p className='text-[#8E929B] text-[10px]'>
-                  {new Date().toLocaleDateString('id-ID', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
-                  })}
-                </p>
-              </div>
-            </div>
-            {schedule.length > 0 && (
-              <span className='text-[10px] font-bold px-2 py-1 rounded-full bg-[#F4F5F7]/15 text-[#F4F5F7] border border-[#F4F5F7]/30'>
-                {doneCount}/{schedule.length} selesai
-              </span>
-            )}
-          </div>
-
-          {loading ? (
-            <div className='flex justify-center py-3'>
-              <div className='w-4 h-4 rounded-full border-2 border-[#2F3238] border-t-[#F4F5F7] animate-spin' />
-            </div>
-          ) : schedule.length === 0 ? (
-            <p className='text-[#8E929B] text-xs leading-relaxed'>
-              {scheduleMessage || 'Tidak ada tugas terjadwal hari ini.'}
-            </p>
-          ) : (
-            <>
-              <p className='text-[#8E929B] text-[10px]'>
-                Estimasi {totalMinutes} menit • Ketuk tugas untuk pindai QR mesin
-              </p>
-              <div className='space-y-1.5'>
-                {schedule.map((slot) => {
-                  const isDone = doneItemIds.has(slot.itemId) || doneItemIds.has(slot.itemCode)
-                  return (
-                    <button
-                      key={slot.scheduleId}
-                      onClick={() => navigate('/scan', { state: { expectedItemId: slot.itemId } })}
-                      disabled={isDone}
-                      className='w-full flex items-center justify-between gap-2 rounded-xl bg-[#18191C] border border-[#2F3238] px-3 py-2 text-left hover:border-[#F4F5F7]/40 disabled:opacity-70 transition-colors'
-                    >
-                      <div className='flex items-center gap-2 min-w-0'>
-                        <span
-                          className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                            isDone
-                              ? 'bg-white/5 text-[#F4F5F7]'
-                              : 'bg-[#F4F5F7]/15 text-[#F4F5F7]'
-                          }`}
-                        >
-                          {slot.itemCode}
-                        </span>
-                        <div className='min-w-0'>
-                          <p className='text-[#DCDDE1] text-xs font-medium truncate'>{slot.itemName}</p>
-                          <p className='text-[#8E929B] text-[10px]'>{slot.durationMinutes} menit</p>
-                        </div>
-                      </div>
-                      {isDone ? (
-                        <CheckCircle2 className='w-4 h-4 text-[#F4F5F7] shrink-0' />
-                      ) : (
-                        <QrCode className='w-4 h-4 text-[#F4F5F7] shrink-0' />
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Recent Issues */}
-        <div className='w-full max-w-sm flex-1'>
-          <div className='flex items-center justify-between mb-3'>
-            <h2 className='text-[#F4F5F7] font-bold text-sm'>
-              Tindak Lanjut
-            </h2>
+        {/* Header tugas */}
+        <div className='flex items-center justify-between'>
+          <h2 className='text-[15px] font-bold text-[#F4F5F7]'>
+            {schedule.length > 0 ? `Tugas Berikutnya (${remaining} dari ${schedule.length})` : 'Tugas Hari Ini'}
+          </h2>
+          {schedule.length > 0 && (
             <button
+              type='button'
               onClick={() => navigate('/history')}
-              className='text-[#8E929B] text-xs hover:text-[#F4F5F7] transition-colors font-medium'
+              className='h-12 px-2 text-[13px] font-semibold text-[#F4F5F7]'
             >
               Lihat semua
             </button>
-          </div>
-
-          <div className='space-y-2.5'>
-            {loading ? (
-              <div className='flex justify-center py-8'>
-                <div className='w-5 h-5 rounded-full border-2 border-[#2F3238] border-t-[#F4F5F7] animate-spin' />
-              </div>
-            ) : recentIssues.length === 0 ? (
-              <div className='text-center py-10'>
-                <p className='text-[#8E929B] text-sm'>Tidak ada masalah aktif</p>
-                <p className='text-[#8E929B] text-xs mt-1'>Pindai kode QR mesin untuk memulai inspeksi</p>
-              </div>
-            ) : (
-              recentIssues.map((issue) => (
-                <motion.button
-                  key={issue.reportId}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  onClick={() => setSelectedReport(issue)}
-                  className='w-full text-left bg-[#222429] border border-[#2F3238] rounded-xl px-4 py-3 flex items-center gap-3 cursor-pointer hover:border-[#2F3238]/80 active:scale-[0.98] transition-all'
-                >
-                  <div className='flex-1 min-w-0'>
-                    <div className='flex items-center gap-2'>
-                      <span className='text-[#F4F5F7] font-semibold text-xs uppercase'>
-                        {getAreaName(issue.areaId)}
-                      </span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full border ${reportStatusTone(issue.status, issue.checklistData?.hasIssues).className}`}>
-                        {reportStatusTone(issue.status, issue.checklistData?.hasIssues).label}
-                      </span>
-                    </div>
-                    <p className='text-[#8E929B] text-[11px] mt-1'>
-                      {getItemLabel(issue)}
-                    </p>
-                  </div>
-                  <div className='flex items-center gap-1.5 text-[#8E929B]'>
-                    <Clock className='w-3.5 h-3.5' />
-                    <span className='text-[11px] tabular-nums'>
-                      {formatTime(issue.timestamp)}
-                    </span>
-                  </div>
-                </motion.button>
-              ))
-            )}
-          </div>
+          )}
         </div>
+
+        {/* Daftar tugas */}
+        {loading ? (
+          <div className='flex h-24 items-center justify-center'>
+            <span className='h-8 w-8 animate-spin rounded-full border-[3px] border-[#2F3238] border-t-[#F4F5F7]' />
+          </div>
+        ) : schedule.length === 0 ? (
+          <div className='flex flex-col items-center rounded-2xl border border-[#2F3238] bg-[#222429] px-5 py-6'>
+            <p className='text-center text-xs text-[#8E929B]'>
+              {scheduleMessage || 'Tidak ada tugas terjadwal hari ini.'}
+            </p>
+            <button
+              type='button'
+              onClick={() => navigate('/scan')}
+              className='mt-2.5 flex h-12 items-center gap-1.5 px-3 text-[13px] font-bold text-[#F4F5F7]'
+            >
+              <QrCode className='h-[18px] w-[18px]' />
+              Pindai Mesin
+            </button>
+          </div>
+        ) : (
+          schedule.map((slot, index) => {
+            const done = isDone(slot)
+            const active = !done && index === firstIncompleteIndex
+            return (
+              <button
+                key={slot.scheduleId || slot.itemId}
+                type='button'
+                onClick={() => navigate('/scan', { state: { expectedItemId: slot.itemId } })}
+                disabled={done}
+                className={`flex w-full items-center gap-3 rounded-[18px] border bg-[#222429] px-3.5 py-3.5 text-left disabled:cursor-default ${
+                  active ? 'border-[#F4F5F7]' : 'border-[#2F3238]'
+                }`}
+              >
+                <span className='shrink-0 rounded-lg bg-[#2C3038] px-2 py-[5px] text-[11px] font-extrabold text-[#F4F5F7]'>
+                  {slot.itemCode}
+                </span>
+                <div className='min-w-0 flex-1'>
+                  <p className='truncate text-[13px] font-bold text-[#F4F5F7]'>{slot.itemName || slot.itemCode}</p>
+                  <p className='mt-0.5 truncate text-[11px] text-[#A8AEBC]'>
+                    {slot.itemCode} • {slot.durationMinutes} menit
+                  </p>
+                </div>
+                {done ? (
+                  <span className='shrink-0 text-[11px] font-bold text-[#F4F5F7]'>Selesai</span>
+                ) : active ? (
+                  <span className='shrink-0 rounded-2xl bg-[#F4F5F7] px-3.5 py-2 text-[11px] font-extrabold text-[#121417]'>
+                    SCAN
+                  </span>
+                ) : (
+                  <span className='shrink-0 text-[11px] font-medium text-[#8E929B]'>Antrian</span>
+                )}
+              </button>
+            )
+          })
+        )}
+
+        {/* Tindak lanjut */}
+        <div className='flex items-center justify-between'>
+          <h2 className='text-[15px] font-bold text-[#F4F5F7]'>Perlu Tindak Lanjut</h2>
+          {recentIssues.length > 0 && (
+            <button
+              type='button'
+              onClick={() => navigate('/history')}
+              className='h-12 px-2 text-[13px] font-semibold text-[#F4F5F7]'
+            >
+              Lihat Semua
+            </button>
+          )}
+        </div>
+
+        {loading ? (
+          <div className='flex h-[120px] items-center justify-center'>
+            <span className='h-8 w-8 animate-spin rounded-full border-[3px] border-[#2F3238] border-t-[#F4F5F7]' />
+          </div>
+        ) : recentIssues.length === 0 ? (
+          <div className='flex flex-col items-center rounded-2xl border border-[#2F3238] bg-[#222429] px-5 py-6'>
+            <div className='flex h-12 w-12 items-center justify-center rounded-full bg-[#C9CED6]/[0.12]'>
+              <CheckCircle2 className='h-[26px] w-[26px] text-[#C9CED6]' />
+            </div>
+            <p className='mt-2.5 text-sm font-semibold text-[#F4F5F7]'>Tidak Ada Tindak Lanjut</p>
+            <p className='mt-1 text-center text-xs text-[#8E929B]'>
+              Semua laporan sudah ditangani. Pindai kode QR mesin untuk memulai inspeksi baru.
+            </p>
+            <button
+              type='button'
+              onClick={() => navigate('/scan')}
+              className='mt-3 flex h-12 items-center gap-1.5 px-3 text-[13px] font-bold text-[#F4F5F7]'
+            >
+              <QrCode className='h-[18px] w-[18px]' />
+              Pindai Mesin Baru
+            </button>
+          </div>
+        ) : (
+          recentIssues.map((report) => (
+            <button
+              key={report.reportId}
+              type='button'
+              onClick={() => setSelectedReport(report)}
+              className='relative flex w-full items-center overflow-hidden rounded-[18px] border border-[#2F3238] bg-[#222429] text-left'
+            >
+              <span className='absolute inset-y-0 left-0 w-1 bg-[#C4623F]' />
+              <div className='flex w-full items-center gap-2 py-3.5 pl-[18px] pr-3.5'>
+                <div className='min-w-0 flex-1'>
+                  <p className='truncate text-[13px] font-bold text-[#F4F5F7]'>
+                    {report.areaName || report.areaId}
+                  </p>
+                  <p className='mt-0.5 truncate text-[11px] text-[#A8AEBC]'>
+                    {report.areaId} • {report.description || 'Ada Masalah'} • {formatDate(report.timestamp)}
+                  </p>
+                </div>
+                <span className='shrink-0 rounded-[13px] border border-[#C4623F] px-2.5 py-[5px] text-[10px] font-extrabold text-[#C4623F]'>
+                  MASALAH
+                </span>
+              </div>
+            </button>
+          ))
+        )}
       </main>
 
       <AnimatePresence>
