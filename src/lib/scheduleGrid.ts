@@ -1,4 +1,5 @@
 import type { Report, ScheduleSlot } from '../types'
+import { reportItemIds } from './reportItems.ts'
 
 export type CellState = 'empty' | 'done' | 'issue'
 
@@ -31,12 +32,6 @@ const startOfDay = (ts: number) => {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
 }
 
-function reportItemId(report: Report): string | null {
-  const items = report.checklistData?.items
-  if (!items) return null
-  return Object.values(items)[0]?.id ?? null
-}
-
 export function daysInMonth(yearMonth: string): number {
   const [ys, ms] = yearMonth.split('-')
   return new Date(Number(ys), Number(ms), 0).getDate()
@@ -49,11 +44,11 @@ export function buildScheduleGrid(
 ): { rows: GridRow[]; days: GridDay[] } {
   const byItemDay = new Map<string, Report>()
   for (const r of reports) {
-    const itemId = reportItemId(r)
-    if (!itemId) continue
-    const key = `${itemId}@${startOfDay(r.timestamp)}`
-    const prev = byItemDay.get(key)
-    if (!prev || r.timestamp > prev.timestamp) byItemDay.set(key, r)
+    for (const itemId of reportItemIds(r)) {
+      const key = `${itemId}@${startOfDay(r.timestamp)}`
+      const prev = byItemDay.get(key)
+      if (!prev || r.timestamp > prev.timestamp) byItemDay.set(key, r)
+    }
   }
 
   const [ys, ms] = (slots[0]?.yearMonth ?? '1970-01').split('-')

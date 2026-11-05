@@ -1,4 +1,5 @@
 import type { Report, ScheduleSlot } from '../types'
+import { reportItemIds } from './reportItems.ts'
 
 /** Progres satu PIC: berapa tugas dijadwalkan, berapa sudah dikerjakan. */
 export interface PicCompletion {
@@ -11,12 +12,6 @@ export interface PicCompletion {
 const startOfDay = (ts: number) => {
   const d = new Date(ts)
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
-}
-
-function reportItemId(report: Report): string | null {
-  const items = report.checklistData?.items
-  if (!items) return null
-  return Object.values(items)[0]?.id ?? null
 }
 
 /**
@@ -35,9 +30,10 @@ export function buildPicCompletion(
 ): Map<string, PicCompletion> {
   const doneKeys = new Set<string>()
   for (const r of reports) {
-    const itemId = reportItemId(r)
-    if (!itemId || !r.workerUid) continue
-    doneKeys.add(`${r.workerUid}@${itemId}@${startOfDay(r.timestamp)}`)
+    if (!r.workerUid) continue
+    for (const itemId of reportItemIds(r)) {
+      doneKeys.add(`${r.workerUid}@${itemId}@${startOfDay(r.timestamp)}`)
+    }
   }
 
   const totals = new Map<string, number>()
